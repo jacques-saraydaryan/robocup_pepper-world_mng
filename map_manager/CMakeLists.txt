@@ -10,6 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   robocup_msgs
   message_generation
+
 )
 
 
@@ -26,6 +27,7 @@ find_package(catkin REQUIRED COMPONENTS
    activateTF_service.srv
    getitP_service.srv
    getOrient_service.srv
+   MakePathService.srv
    saveitP_service.srv
    saveOrient_service.srv
    saveitP_base_link_service.srv
@@ -41,6 +43,6 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate added messages and services with any dependencies listed here
  generate_messages(
    DEPENDENCIES
-   std_msgs geometry_msgs robocup_msgs
+   std_msgs geometry_msgs robocup_msgs 
  )
 
