@@ -34,7 +34,7 @@ class MapMng:
         Initializes the server for the management of interactive markers, the publisher for the display of edges, the
         subscriber to listen to the Clicked Point tool of RViz, an observer and an event handler to watch the
         modification of the files
-        :param cfg_path: Path to save IntMark and Edges data file
+        :param cfg_path: Path to save IntMark and Edges data files
         """
         global CONFIG_PATH
         CONFIG_PATH = cfg_path
