@@ -1,0 +1,5 @@
+string act
+string node
+float32 weight
+---
+bool success

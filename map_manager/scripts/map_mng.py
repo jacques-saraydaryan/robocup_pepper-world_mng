@@ -35,6 +35,7 @@ class MapMng:
         modification of the files
         """
         self.CONFIG_PATH = _cfgpath  # Path where data files will be saved and loaded
+        rospy.loginfo("Path : {}".format(self.CONFIG_PATH))
         self.itm_list = []  # List of all IntMark objects
         self.edges_list = []  # List of all Edge objects
         self.start_temp_mark = ""  # Variable that keeps track of the first IntMark object used to create an edge
@@ -54,7 +55,7 @@ class MapMng:
         self.edge_pub = rospy.Publisher("interactive_marker_edges", Marker, queue_size=10)
         self.subscriber = rospy.Subscriber("clicked_point", PointStamped, self.add_itm)
         rospy.wait_for_service("/static_map", 5)
-        self._getMap = rospy.ServiceProxy("static_map", GetMap)
+        self._getMap = rospy.ServiceProxy("/static_map", GetMap)
         rospy.wait_for_service("/move_base/make_plan", 5)
         self.path = rospy.ServiceProxy("/move_base/make_plan", GetPlan)
         # ROS Services
@@ -934,12 +935,15 @@ class MapEdge:
 
 
 if __name__ == '__main__':
-    default_value = os.path.join(os.path.dirname(__file__), '../json/map_test/')
     rospy.init_node("pepper_interactive_marker")
-    _cfgpath = rospy.get_param("~confPath", default_value)
 
-    manager = MapMng(_cfgpath)
-    time.sleep(1)  # HACK - Wait for ROS Subscribers to listen to the edge publisher
-    manager.load()
-
-    rospy.spin()
+    default_value = 'map_test/'
+    dir_name = rospy.get_param("~confPath", default_value)
+    _cfgpath = os.path.join(os.path.dirname(__file__), '../json/') + dir_name
+    if not os.path.isdir(_cfgpath):
+        rospy.logerr("Directory {} does not exist, create it before executing the program".format(_cfgpath))
+    else:
+        manager = MapMng(_cfgpath)
+        time.sleep(1)  # HACK - Wait for ROS Subscribers to listen to the edge publisher
+        manager.load()
+        rospy.spin()
