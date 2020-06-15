@@ -35,7 +35,7 @@ class Mm:
     _activateTF_service = ""
     _tflistener = ""
     _tfPublisherRunning=True
-    _reloadItAfterPublishingTf = False
+    _reloadItAfterPublishingTf=True
     _broadcastTfPeriod = 2
 
     def __init__(self,conf_path):
@@ -55,7 +55,7 @@ class Mm:
 
         self._tflistener = TransformListener()
 
-        self.loadInterestPoint()
+        #self.loadInterestPoint()
 
         #start publishing It Tf
         thread.start_new_thread(self.publishInterestPointTf,())
@@ -114,13 +114,13 @@ class Mm:
         rospy.loginfo('Successful save ot the interestPoint' + str(json_str))
         return True
 
-
     ####
     #  Load interest points from config file
     ####
     def loadInterestPoint(self):
         dirs = os.listdir(self.CONFIG_PATH)
-
+        #Reload IP in the map
+        self._mapIP_Position={}
         # This would print all the files and directories
         for fileName in dirs:
 
@@ -185,9 +185,14 @@ class Mm:
         while(self._tfPublisherRunning and not rospy.is_shutdown()):
             br = tf.TransformBroadcaster()
             for k, v in self._mapIP_Position.iteritems():
+                # br.sendTransform((v.pose.position.x, v.pose.position.y, v.pose.position.z),
+                #                  (v.pose.orientation.x, v.pose.orientation.y,v.pose.orientation.z,v.pose.orientation.w),
+                #                  rospy.Time.now(),
+                #                  str(k)+'_TF',
+                #                  "map")
                 br.sendTransform((v.pose.position.x, v.pose.position.y, v.pose.position.z),
                                  (v.pose.orientation.x, v.pose.orientation.y,v.pose.orientation.z,v.pose.orientation.w),
-                                 rospy.Time.now(),
+                                 rospy.Time(0),
                                  str(k)+'_TF',
                                  "map")
             time.sleep(self._broadcastTfPeriod)
@@ -204,8 +209,8 @@ if __name__ == '__main__':
     #  rosrun map_manager MapManager.py _confPath:="/home/astrostudent/evers_ws/conf/ITs"
     #
     ####################
-    default_value="/home/xia0ben/pepper_ws/data/world_mng/interest_points/"
-
+    # default_value="/home/xia0ben/pepper_ws/data/world_mng/interest_points/"
+    default_value="./data/world_mng/interest_points/"
     rospy.init_node('map_management_server')
     config_directory_param=rospy.get_param("~confPath",default_value)
     mm = Mm(config_directory_param)
