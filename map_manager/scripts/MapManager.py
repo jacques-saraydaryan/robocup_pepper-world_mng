@@ -90,8 +90,8 @@ class Mm:
         # transform = StampedTransform()
         # self._tflistener.lookupTransform("base_link", "/map", rospy.Time.now(), transform)
         # self._tflistener.waitForTransform("base_link", "/map", rospy.Time.now(), rospy.Duration
-        now = rospy.Time.now()
-        self._tflistener.waitForTransform("/map", "/base_link", now, rospy.Duration(2.0))
+        now = rospy.Time(0)
+        self._tflistener.waitForTransform("/map", "/base_link", now, rospy.Duration(10.0))
         (trans, rot) = self._tflistener.lookupTransform("/map", "/base_link", now)
         robotPose = Pose()
         robotPose.position.x = trans[0]
