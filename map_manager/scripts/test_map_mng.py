@@ -45,7 +45,7 @@ class TestIntMark(unittest.TestCase):
         pose1.orientation.y = 0.0
         pose1.orientation.z = 0.0
         pose1.orientation.w = 0.0
-        itm = ItM(name="ItM5", pose=pose1)
+        itm = ItM(name="ItM5", nature="None", pose=pose1)
         self.success = handle(itm)
         rospy.spin()
 
@@ -62,7 +62,7 @@ class TestIntMark(unittest.TestCase):
 
         ps1 = Point(x=-2.0, y=5.35, z=0.002)
         ps2 = Point(x=-2.38, y=8.19, z=0.002)
-        chk_obs = self.manager.check_distance(ps1, ps2)
+        chk_obs = self.manager.measure_distance(ps1, ps2)
         rospy.spin()
 
 

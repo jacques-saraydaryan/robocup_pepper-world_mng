@@ -30,6 +30,7 @@ find_package(catkin REQUIRED COMPONENTS
    GetItM.srv
    GotoPoint.srv
    MakePath.srv
+   ModifyItM.srv
    saveitP_service.srv
    saveOrient_service.srv
    saveitP_base_link_service.srv

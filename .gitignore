@@ -2,3 +2,4 @@
 /workspace.xml
 .idea
 map_manager/json/*
+map_manager/scripts/.vscode
