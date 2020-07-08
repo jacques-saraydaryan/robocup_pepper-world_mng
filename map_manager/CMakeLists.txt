@@ -22,15 +22,15 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate services in the 'srv' folder
  add_service_files(
    FILES
-   AddItM.srv
+   AddNode.srv
    AddEdge.srv
    activateTF_service.srv
    getitP_service.srv
    getOrient_service.srv
-   GetItM.srv
+   GetNode.srv
    GotoPoint.srv
    MakePath.srv
-   ModifyItM.srv
+   ModifyNode.srv
    saveitP_service.srv
    saveOrient_service.srv
    saveitP_base_link_service.srv

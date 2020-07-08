@@ -2,4 +2,4 @@ string mode
 geometry_msgs/PoseStamped start
 geometry_msgs/PoseStamped end
 ---
-robocup_msgs/ItM[] list_of_itms
+robocup_msgs/Graph path

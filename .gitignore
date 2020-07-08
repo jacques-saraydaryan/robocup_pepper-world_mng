@@ -3,3 +3,5 @@
 .idea
 map_manager/json/*
 map_manager/scripts/.vscode
+map_manager/scripts/test.py
+map_manager/scripts/old_map_mng.py

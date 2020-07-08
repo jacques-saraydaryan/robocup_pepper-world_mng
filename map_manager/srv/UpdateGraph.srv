@@ -1,5 +1,5 @@
 string act
 string node
-float32 weight
+int64 weight
 ---
 bool success

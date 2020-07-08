@@ -21,19 +21,22 @@ from interactive_markers.interactive_marker_server import InteractiveMarkerServe
 from nav_msgs.srv import GetMap, GetPlan
 
 from map_manager.srv import *
-from robocup_msgs.msg import Graph, ItM, Edge
+from robocup_msgs.msg import Graph, Node, Edge
 
 COLORS = {"RED": ColorRGBA(1.0, 0.0, 0.0, 1.0),
           "GREEN": ColorRGBA(0.0, 1.0, 0.0, 1.0),
           "BLUE": ColorRGBA(0.0, 0.0, 1.0, 1.0)
           }
 MAP_FRAME = "map"
+MAP_RESOLUTION = 0.0    # Resolution of the map in meters/cell
+TRUE_VALUE = ["True", "true", "TRUE", 1]
+FALSE_VALUE = ["False", "false", "FALSE", 0]
 
 
 class MapMng:
     """
     Class for the management of the map of the environment of the robot, it makes the link between the objects of the
-    other classes (MapItM, MapGraph, MapEdge)
+    other classes (MapNode, MapGraph, MapEdge)
     """
 
     def __init__(self, _cfgpath):
@@ -44,9 +47,9 @@ class MapMng:
         """
         self.CONFIG_PATH = _cfgpath  # Path where data files will be saved and loaded
         rospy.loginfo("Path : {}".format(self.CONFIG_PATH))
-        self.itms_list = []  # List of all MapItM objects
+        self.nodes_list = []  # List of all MapNode objects
         self.edges_list = []  # List of all MapEdge objects
-        self.first_map_itm = None  # Variable that keeps track of the first MapItM object used to create an edge
+        self.first_node_selected = None  # Variable that keeps track of the first MapNode object used to create an edge
         self.current_map = None
 
         # Observer and event handler to watch any modifications of the data files
@@ -56,23 +59,30 @@ class MapMng:
         self.observer.start()
 
         # Initialization of objects and variables
-        MapItM.init_map_mng(self)
+        MapNode.init_map_mng(self)
+        MapEdge.init_map_mng(self)
         self.map_graph = MapGraph()
-        self.server = InteractiveMarkerServer("pepper_interactive_markers")
-        self.edge_pub = rospy.Publisher("interactive_marker_edges", Marker, queue_size=10)
-        self.subscriber = rospy.Subscriber("clicked_point", PointStamped, self.add_itm)
+        self.node_server = InteractiveMarkerServer("pepper_nodes_server")
+        self.edge_server = InteractiveMarkerServer("pepper_edges_server")
+        self.subscriber = rospy.Subscriber("clicked_point", PointStamped, self.add_node)
 
-        rospy.wait_for_service("/static_map", 5)
-        self.get_map = rospy.ServiceProxy("/static_map", GetMap)
-        self.init_map()
+        try:
+            rospy.wait_for_service("/static_map", 5)
+            self.get_map_service_proxy = rospy.ServiceProxy("/static_map", GetMap)
+            self.init_map()
+        except Exception as e:
+            rospy.logwarn("Service static_map call failed : {}".format(e))
 
-        rospy.wait_for_service("/move_base/make_plan", 5)
-        self.path = rospy.ServiceProxy("/move_base/make_plan", GetPlan)
+        try:
+            rospy.wait_for_service("/move_base/make_plan", 5)
+            self.path_service_proxy = rospy.ServiceProxy("/move_base/make_plan", GetPlan)
+        except Exception as e:
+            rospy.logwarn("Service move_base/make_plan call failed : {}".format(e))
 
         # ROS Services
-        self.add_itm_service = rospy.Service("/pepper/add_itm", AddItM, self.add_itm_srv)
-        self.get_itm_service = rospy.Service("/pepper/get_itm", GetItM, self.get_itm_srv)
-        self.modify_itm_service = rospy.Service("/pepper/modify_itm", ModifyItM, self.modify_itm_srv)
+        self.add_node_service = rospy.Service("/pepper/add_node", AddNode, self.add_node_srv)
+        self.get_node_service = rospy.Service("/pepper/get_node", GetNode, self.get_node_srv)
+        self.modify_node_service = rospy.Service("/pepper/modify_node", ModifyNode, self.modify_node_srv)
         self.add_edge_service = rospy.Service("/pepper/add_edge", AddEdge, self.add_edge_srv)
         self.send_graph_service = rospy.Service("/pepper/send_graph", SendGraph, self.send_graph_srv)
         self.make_path_service = rospy.Service("/pepper/make_path", MakePath, self.make_path_srv)
@@ -82,55 +92,80 @@ class MapMng:
         """
         Get the nav_msgs/OccupancyGrid map currently used by the robot
         """
-        global MAP_FRAME
+        global MAP_FRAME, MAP_RESOLUTION
 
-        self.current_map = self.get_map().map
+        self.current_map = self.get_map_service_proxy().map
         MAP_FRAME = self.current_map.header.frame_id
+        MAP_RESOLUTION = self.current_map.info.resolution
         rospy.loginfo("Map frame : {}".format(MAP_FRAME))
 
-    def get_itm(self, itm_name):
+    def get_node(self, node_name):
         """
-        Return the MapItM object corresponding to the `itm_name`
-        :param itm_name: Name of the MapItM object to find in the list
-        :return: The MapItM object if it exists, None otherwise
+        Return the MapNode object corresponding to the `node_name`
+        :param node_name: Name of the MapNode object to find in the list
+        :return: The MapNode object if it exists, None otherwise
         """
-        itms = [itm for itm in self.itms_list if itm.int_marker.name == itm_name]
-        if len(itms) < 1:
-            rospy.loginfo("MapItM object of name {} not found".format(itm_name))
+        nodes = [node for node in self.nodes_list if node.int_marker.name == node_name]
+        if len(nodes) < 1:
+            rospy.logerr("MapNode object of name {} not found".format(node_name))
             return None
-        elif len(itms) > 1:
-            rospy.loginfo("Multiple MapItM objects of name {} found, only 1 is allowed".format(itm_name))
+        elif len(nodes) > 1:
+            rospy.logerr("Multiple MapNode objects of name {} found, only 1 is allowed".format(node_name))
             return None
-        return itms[0]
+        return nodes[0]
 
-    def get_edge(self, edge_id):
+    def get_edge(self, edge_name=None, node_1_name=None, node_2_name=None):
         """
-        Return the MapEdge object corresponding to `edge_id`
-        :param edge_id: Id of the MapEdge object to find in the list
+        Return the MapEdge object corresponding to the edge name or the two nodes
+        :param edge_name: Name of the edge
+        :param node_1_name: Name of first node
+        :param node_2_name: Name of second node
         :return: The MapEdge object if it exists, None otherwise
         """
-        edges = [edge for edge in self.edges_list if edge.edge_marker.id == edge_id]
+        if edge_name is not None:
+            edges = [edge for edge in self.edges_list if edge.edge_int_marker.name == edge_name]
+        elif node_1_name is not None and node_2_name is not None:
+            edges = [edge for edge in self.edges_list if (edge.node_1_name == node_1_name and edge.node_2_name == node_2_name)
+                                                      or (edge.node_2_name == node_1_name and edge.node_1_name == node_2_name)]
+        else:
+            return None
         if len(edges) < 1:
-            rospy.loginfo("MapEdge object of Id {} not found".format(edge_id))
+            rospy.logerr("MapEdge object of name {} not found".format(edge_name))
             return None
         elif len(edges) > 1:
-            rospy.loginfo("Multiple MapEdge objects of Id {} found, only 1 is allowed".format(edge_id))
+            rospy.logerr("Multiple MapEdge objects of name {} found, only 1 is allowed".format(edge_name))
             return None
         return edges[0]
 
     @staticmethod
     def get_key_from_value(dictionary, value):
+        """
+        Get the key corresponding to `value` in `dictionary`, only possible in dictionaries where all values are different
+        :param dictionary: the dictionary to search
+        :param value: the value
+        :return:
+        """
         for _key in dictionary.keys():
             if dictionary[_key] == value:
                 return _key
         rospy.logwarn("No key has a value of {} in dictionary {}".format(value, dictionary))
         return None
 
+    @staticmethod
+    def convert_to_bool(string):
+        if string in TRUE_VALUE:
+            return True
+        elif string in FALSE_VALUE:
+            return False
+        else:
+            print("Error, string {} neither in values accepted as True nor as False, returning False as default".format(string))
+            return False
+
     # ----------------
     # Add/Load methods
     def load(self):
         """
-        Method that loads all the MapItMs and MapEdges from the CONFIG_PATH folder
+        Method that loads all the MapNodes and MapEdges from the CONFIG_PATH folder
         """
         dirs = os.listdir(self.CONFIG_PATH)
         edges_files = []
@@ -138,8 +173,8 @@ class MapMng:
         for filename in dirs:
             with open(self.CONFIG_PATH + filename, 'r') as f:
                 data = eval(json.dumps(json.load(f)))
-                if data['type'] == "MapItM":
-                    self.add_itm(data, True)
+                if data['type'] == "MapNode":
+                    self.add_node(data, True)
                 elif data['type'] == "MapEdge":
                     edges_files.append(filename)
                 else:
@@ -148,228 +183,207 @@ class MapMng:
         for filename in edges_files:
             with open(self.CONFIG_PATH + filename, 'r') as f:
                 data = eval(json.dumps(json.load(f)))
-            if not self.load_edge(data):
-                rospy.logwarn("Interactive Markers of the Edge not found, deleting Edge file")
+            if not self.add_edge(data['first node'], data['second node'], data['name'], data['weight'], self.convert_to_bool(data['is_crossing_door'])):
+                rospy.logwarn("MapNodes of the Edge not found, deleting Edge file")
                 os.remove(self.CONFIG_PATH + filename)
 
         rospy.loginfo(
-            "{} Interactive Markers and {} Edges have been loaded".format(len(self.itms_list), len(self.edges_list)))
+            "{} MapNodes and {} MapEdges have been loaded".format(len(self.nodes_list), len(self.edges_list)))
 
-    def add_itm(self, data, loaded_data=False):
+    def add_node(self, data, loaded_data=False):
         """
-        Method called to create a MapItM object or to load an existing one
-        :param data: The data of the MapItM object
-        :param loaded_data: True if it's a loaded MapItM so data is a dictionnary from the .json file, False otherwise
-        so data is a Clicked Point message
+        Method called to create a MapNode object or to load an existing one
+        :param data: The data of the MapNode object
+        :param loaded_data: True if it's a loaded MapNode so data is a dictionnary, or False so data is a Clicked Point message
         """
-        map_itm = MapItM(data, loaded_data)
+        map_node = MapNode(data, loaded_data)
 
-        self.server.insert(map_itm.int_marker, self.int_mark_process_feedback)
-        map_itm.menu_handler.apply(self.server, map_itm.int_marker.name)
-        self.server.applyChanges()
+        self.node_server.insert(map_node.int_marker, self.int_mark_process_feedback)
+        map_node.menu_handler.apply(self.node_server, map_node.int_marker.name)
+        self.node_server.applyChanges()
 
-        self.itms_list.append(map_itm)
-        self.map_graph.add_marker_to_graph(map_itm.int_marker.name)
+        self.nodes_list.append(map_node)
+        self.map_graph.add_node_to_graph(map_node.int_marker.name)
         if not loaded_data:
-            self.save_file(map_itm, "MapItM")
-        return map_itm
+            self.save_file(map_node, "MapNode")
+        return map_node
 
-    def load_edge(self, data):
+    def add_edge(self, node_1_name, node_2_name, name_=None, weight_=1, is_crossing_door_=False):
         """
-        Method used to load the existing edge given in parameter
-        :param data: The data file of the edge
-        :return: True if the MapEdge has been correctly loaded, False otherwise
-        """
-        temp_itm_1 = self.get_itm(data['start marker'])
-        temp_itm_2 = self.get_itm(data['end marker'])
-        if temp_itm_1 is None or temp_itm_2 is None:
-            return False
-
-        new_edge = MapEdge(temp_itm_1.int_marker, temp_itm_2.int_marker, data['id'], data['weight'])
-        temp_itm_1.list_of_edges.append(new_edge)
-        temp_itm_2.list_of_edges.append(new_edge)
-
-        self.edge_pub.publish(new_edge.edge_marker)
-        self.edges_list.append(new_edge)
-        self.map_graph.add_edge_to_graph(data['start marker'], data['end marker'], data['weight'])
-        return True
-
-    def create_edge(self, feedback):
-        """
-        Method that works in two times :
-            - The first time the user click on "create edge" in the menu of the interactive marker, it saves that marker in memory
-            - The second time, it creates the MapEdge object
-        :param feedback: InteractiveMarkerFeedback
+        Create the MapEdge object
+        :param node_1_name: Name of first node
+        :param node_2_name: Name of second node
+        :param name_: Name of the edge
+        :param weight_: Weight for the dijkstra algorithm
+        :param is_crossing_door_: True if the edge should represent a door, False otherwise
         :return:
         """
-        if self.first_map_itm is None:
-            self.first_map_itm = self.get_itm(feedback.marker_name)
-        else:
-            end_map_itm = self.get_itm(feedback.marker_name)
-            if end_map_itm.int_marker == self.first_map_itm.int_marker:
-                rospy.logwarn("Same interactive marker selected twice, select an other couple of nodes")
-                self.first_map_itm = None
-                return
-            if self.map_graph.is_neighbor(self.first_map_itm.int_marker.name, end_map_itm.int_marker.name):
-                rospy.logwarn("Edge already exists, select an other couple of nodes")
-                self.first_map_itm = None
-                return
-            current_edge = MapEdge(self.first_map_itm.int_marker, end_map_itm.int_marker)
-            self.first_map_itm.list_of_edges.append(current_edge)
-            end_map_itm.list_of_edges.append(current_edge)
+        temp_node_1 = self.get_node(node_1_name)
+        temp_node_2 = self.get_node(node_2_name)
+        if temp_node_1 is None or temp_node_2 is None:
+            rospy.logerr("Edge : First MapNode={} , Second MapNode={}".format(temp_node_1, temp_node_2))
+            return False
+        if temp_node_1 == temp_node_2:
+            rospy.logwarn("Same interactive marker selected twice, select an other couple of nodes")
+            return False
+        if self.map_graph.is_neighbor(node_1_name, node_2_name):
+            rospy.logwarn("Edge already exists, select an other couple of nodes")
+            return False
 
-            self.edges_list.append(current_edge)
-            self.edge_pub.publish(current_edge.edge_marker)
-            self.map_graph.add_edge_to_graph(self.first_map_itm.int_marker.name, end_map_itm.int_marker.name)
-            self.save_file(current_edge, "MapEdge")
-            self.first_map_itm = None
+        map_edge = MapEdge(temp_node_1, temp_node_2, name_, weight_, is_crossing_door_)
+        temp_node_1.list_of_edges.append(map_edge)
+        temp_node_2.list_of_edges.append(map_edge)
 
-    def change_marker_nature(self, feedback):
+        self.edge_server.insert(map_edge.edge_int_marker)
+        map_edge.menu_handler.apply(self.edge_server, map_edge.edge_int_marker.name)
+        self.edge_server.applyChanges()
+
+        self.edges_list.append(map_edge)
+        self.map_graph.add_edge_to_graph(node_1_name, node_2_name, weight_)
+        if name_ is None:
+            self.save_file(map_edge, "MapEdge")
+
+        return True
+
+    def change_door_mode(self, feedback):
         """
-        Change the nature of the MapItM, for the moment it can be None (a normal MapItM) or Door (a MapItM representing the side of a door)
+        Defines if the edge in the feedback is crossing a door or not depending on if the box in the menu of the edge is checked or not
         :param feedback: InteractiveMarkerFeedback
         """
-        itm = self.get_itm(feedback.marker_name)
+        edge = self.get_edge(edge_name=feedback.marker_name)
+        handle = feedback.menu_entry_id
+        state = edge.menu_handler.getCheckState(handle)
 
-        itm.menu_handler.setCheckState(itm.handle, MenuHandler.UNCHECKED)
-        itm.handle = feedback.menu_entry_id
-        itm.menu_handler.setCheckState(itm.handle, MenuHandler.CHECKED)
-        itm.nature = itm.menu_handler.getTitle(itm.handle)
+        if state == MenuHandler.CHECKED:
+            edge.menu_handler.setCheckState(handle, MenuHandler.UNCHECKED)
+            edge.is_crossing_door = False
+        else:
+            edge.menu_handler.setCheckState(handle, MenuHandler.CHECKED)
+            edge.is_crossing_door = True
 
-        itm.menu_handler.apply(self.server, itm.int_marker.name)
-        self.server.applyChanges()
-        self.save_file(itm, "MapItM")
+        edge.menu_handler.reApply(self.edge_server)
+        self.edge_server.applyChanges()
+        self.save_file(edge, "MapEdge")
+
 
     # --------------------
     # Delete methods
-    def delete_itm(self, feedback):
+    def delete_node(self, node_):
         """
-        Delete the MapItm
-        :param feedback: InteractiveMarkerFeedback
+        Delete the MapNode
+        :param node_: MapNode object
         """
-        itm = self.get_itm(feedback.marker_name)
-        self.delete_all_edges(feedback)
-        self.map_graph.delete_node_on_graph(itm.int_marker.name)
-        self.server.erase(itm.int_marker.name)
-        self.server.applyChanges()
+        self.delete_all_edges(node_)
+        self.map_graph.delete_node_on_graph(node_.int_marker.name)
 
-        self.itms_list.remove(itm)
-        if os.path.exists(self.CONFIG_PATH + itm.int_marker.name + '.json'):
-            os.remove(self.CONFIG_PATH + itm.int_marker.name + '.json')
+        self.node_server.erase(node_.int_marker.name)
+        self.node_server.applyChanges()
+        self.nodes_list.remove(node_)
+        if os.path.exists(self.CONFIG_PATH + node_.int_marker.name + '.json'):
+            os.remove(self.CONFIG_PATH + node_.int_marker.name + '.json')
 
-    def delete_all_edges(self, feedback):
+    def delete_all_edges(self, node_):
         """
-        Delete all the edges associated to the MapItM object
-        :param feedback: InteractiveMarkerFeedback
+        Delete all the edges associated to the MapNode object
+        :param node_: MapNode object
         """
-        itm = self.get_itm(feedback.marker_name)
-        for edge in reversed(itm.list_of_edges):
-            self.delete_edge(edge)
+        for edge_ in reversed(node_.list_of_edges):
+            self.delete_edge(edge_)
 
-    def delete_edge(self, edge):
+    def delete_edge(self, edge_):
         """
         Delete the MapEdge object
-        :param edge: The MapEdge object to be deleted
+        :param edge_: MapEdge object
         """
-        self.map_graph.delete_edge_on_graph(edge.int_mark_1.name, edge.int_mark_2.name)
-        itm1 = self.get_itm(edge.int_mark_1.name)
-        itm1.list_of_edges.remove(edge)
-        itm2 = self.get_itm(edge.int_mark_2.name)
-        itm2.list_of_edges.remove(edge)
+        self.map_graph.delete_edge_on_graph(edge_.node_1_name, edge_.node_2_name)
+        node_1 = self.get_node(edge_.node_1_name)
+        node_1.list_of_edges.remove(edge_)
+        node_2 = self.get_node(edge_.node_2_name)
+        node_2.list_of_edges.remove(edge_)
 
-        edge.delete_edge()
-        self.edges_list.remove(edge)
-        temp_path = self.CONFIG_PATH + edge.name + '.json'
+        self.edge_server.erase(edge_.edge_int_marker.name)
+        self.edge_server.applyChanges()
+        self.edges_list.remove(edge_)
+        temp_path = self.CONFIG_PATH + edge_.edge_int_marker.name + '.json'
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
     # --------------------
     # ROS Services and specific methods
-    def add_itm_srv(self, req):
+    def add_node_srv(self, req):
         """
-        A ROS Service that uses the request `req` to create a MapItM
+        A ROS Service that uses the request `req` to create a MapNode
         :param req: the request containing all the attributes
         :return:
         """
-        data = {"name": req.new_itm.name,
-                "description": req.new_itm.name,
-                "nature": req.new_itm.nature,
+        data = {"name": req.new_node.name,
+                "description": req.new_node.name,
                 "color": "GREEN",
-                "type": "MapItM",
+                "type": "MapNode",
                 "pose": {
                     "position": {
-                        "x": req.new_itm.pose.position.x,
-                        "y": req.new_itm.pose.position.y,
-                        "z": req.new_itm.pose.position.z
+                        "x": req.new_node.pose.position.x,
+                        "y": req.new_node.pose.position.y,
+                        "z": req.new_node.pose.position.z
                     },
                     "orientation": {
-                        "x": req.new_itm.pose.orientation.x,
-                        "y": req.new_itm.pose.orientation.y,
-                        "z": req.new_itm.pose.orientation.z,
-                        "w": req.new_itm.pose.orientation.w
+                        "x": req.new_node.pose.orientation.x,
+                        "y": req.new_node.pose.orientation.y,
+                        "z": req.new_node.pose.orientation.z,
+                        "w": req.new_node.pose.orientation.w
                     }
                 }
                 }
-        self.save_file(self.add_itm(data, True), "MapItM")
-        return AddItMResponse(True)
+        self.save_file(self.add_node(data, True), "MapNode")
+        return AddNodeResponse(True)
 
-    def get_itm_srv(self, req):
+    def get_node_srv(self, req):
         """
-        A ROS Service that returns the name and pose of the MapItM object corresponding to the name in the request
+        A ROS Service that returns the name and pose of the MapNode object corresponding to the name in the request
         :param req: The request from the client
-        :return: A robocup_msgs/ItM message
+        :return: A robocup_msgs/Node message
         """
-        itm = self.get_itm(req.name)
-        if itm is None:
-            return GetItMResponse(ItM(name="", nature="", pose=None))
-        return GetItMResponse(ItM(name=itm.int_marker.name, nature=itm.nature, pose=itm.int_marker.pose))
+        node_ = self.get_node(req.name)
+        if node_ is None:
+            return GetNodeResponse(Node(name="", pose=None))
+        return GetNodeResponse(Node(name=node_.int_marker.name, pose=node_.int_marker.pose))
 
-    def modify_itm_srv(self, req):
+    def modify_node_srv(self, req):
         """
-        A ROS Service to modify some attributes of a MapItM
+        A ROS Service to modify some attributes of a MapNode
         :param req: The request with the attribute to change and it's new value
         :return: True if it succeeded changing the attribute, False otherwise
         """
-        _itm = self.get_itm(req.itm_name)
-        if _itm is None:
-            rospy.logwarn("Changing attribute of an inexisting Interactive Marker, check the name you entered in the request")
-            return ModifyItMResponse(False)
+        node_ = self.get_node(req.node_name)
+        if node_ is None:
+            rospy.logwarn("The Node doesn't exist, check the name you entered in the request")
+            return ModifyNodeResponse(False)
 
         if req.attribute == "color" and req.new_value in COLORS:
-            for _control in _itm.int_marker.controls:
+            for _control in node_.int_marker.controls:
                 if _control.name == "marker":
                     _control.markers[0].color = COLORS[req.new_value]
         else:
             rospy.logwarn("Attribute can't be modified or the new value is not allowed")
-            return ModifyItMResponse(False)
+            return ModifyNodeResponse(False)
 
-        tmp_itm = _itm
-        self.server.erase(_itm.int_marker.name)
-        self.server.applyChanges()
-        self.server.insert(tmp_itm.int_marker, self.int_mark_process_feedback)
-        tmp_itm.menu_handler.apply(self.server, tmp_itm.int_marker.name)
-        self.server.applyChanges()
+        self.node_server.erase(node_.int_marker.name)
+        self.node_server.applyChanges()
+        self.node_server.insert(node_.int_marker, self.int_mark_process_feedback)
+        node_.menu_handler.apply(self.node_server, node_.int_marker.name)
+        self.node_server.applyChanges()
 
-        self.save_file(tmp_itm, "MapItM")
-        return ModifyItMResponse(True)
+        self.save_file(node_, "MapNode")
+        return ModifyNodeResponse(True)
 
     def add_edge_srv(self, req):
         """
-        A ROS Service that adds an edge between the two Interactive markers in the request
-        :param req: Contains the name of the two Interactive markers
+        A ROS Service that adds an edge between the two MapNodes in the request
+        :param req: Contains the name of the two MapNodes, its weight and a boolean if it crosses a door or not
         :return:
         """
-        temp_itm_1 = self.get_itm(req.new_edge.first_node)
-        temp_itm_2 = self.get_itm(req.new_edge.second_node)
-        new_edge = MapEdge(temp_itm_1.int_marker, temp_itm_2.int_marker)
-        temp_itm_1.list_of_edges.append(new_edge)
-        temp_itm_2.list_of_edges.append(new_edge)
-
-        self.edge_pub.publish(new_edge.edge_marker)
-        self.edges_list.append(new_edge)
-        self.map_graph.add_edge_to_graph(req.new_edge.first_node, req.new_edge.second_node)
-        self.save_file(new_edge, "MapEdge")
-        return AddEdgeResponse(True)
+        success = self.add_edge(req.first_node, req.second_node, None, req.weight, req.is_crossing_door)
+        return AddEdgeResponse(success)
 
     def send_graph_srv(self, req):
         """
@@ -378,10 +392,11 @@ class MapMng:
         :return: The Graph object
         """
         graph_resp = Graph()
-        for itm in self.itms_list:
-            graph_resp.nodes.append(ItM(name=itm.int_marker.name, nature=itm.nature, pose=itm.int_marker.pose))
-        for _edge in self.edges_list:
-            graph_resp.edges.append(Edge(first_node=_edge.int_mark_1.name, second_node=_edge.int_mark_2.name))
+        for node_ in self.nodes_list:
+            graph_resp.nodes.append(Node(name=node_.int_marker.name, pose=node_.int_marker.pose))
+        for edge_ in self.edges_list:
+            graph_resp.edges.append(Edge(first_node=edge_.node_1_name, second_node=edge_.node_2_name,
+                                         weight=edge_.weight, is_crossing_door=edge_.is_crossing_door))
         return SendGraphResponse(graph_resp)
 
     def change_node_weight_srv(self, req):
@@ -394,13 +409,13 @@ class MapMng:
             for edge in self.edges_list:
                 edge.edge_weight = 1.0
                 self.save_file(edge, "MapEdge")
-                self.map_graph.change_edge_weight(edge.int_mark_1.name, edge.int_mark_2.name, 1.0)
+                self.map_graph.change_edge_weight(edge.node_1_name, edge.node_2_name, 1.0)
         else:
-            itm = self.get_itm(req.node)
-            for edge in itm.list_of_edges:
+            node_ = self.get_node(req.node)
+            for edge in node_.list_of_edges:
                 edge.edge_weight = req.weight
                 self.save_file(edge, "MapEdge")
-                self.map_graph.change_edge_weight(edge.int_mark_1.name, edge.int_mark_2.name, req.weight)
+                self.map_graph.change_edge_weight(edge.node_1_name, edge.node_2_name, req.weight)
 
         return UpdateGraphResponse(True)
 
@@ -409,89 +424,102 @@ class MapMng:
         A ROS Service to return the list of interactive markers to go from one interactive marker to another.
         It uses the Dijkstra algorithm from the Networkx package.
         :param req: The request containing the two points in space
-        :return: The list of the interactive markers between the start and the end
+        :return: The list of the interactive markers between the start and the end and the list of edges
         """
-        itms_list_resp = []
+        path = Graph()
 
         if req.mode == "fast_ros_plan":
-            ros_make_plan = self.path(req.start, req.end, 0.0)
-            result = self.check_itms_on_path(ros_make_plan.plan.poses)
-            itm_near_start_point = result[0][0]
-            itm_near_end_point = result[-1][0]
+            ros_make_plan = self.path_service_proxy(req.start, req.end, 0.0)
+            result = self.check_nodes_on_path(ros_make_plan.plan.poses)
+            start_node = result[0]
+            end_node = result[-1]
         else:
             if req.mode != "euclidian" and req.mode != "ros_plan":
                 req.mode = "euclidian"
-            res1 = self.find_nearest_itm(req.start.pose, req.mode)
-            res2 = self.find_nearest_itm(req.end.pose, req.mode)
-            itm_near_start_point = res1[0]
-            itm_near_end_point = res2[0]
+            res1 = self.find_nearest_node(req.start.pose, req.mode)
+            res2 = self.find_nearest_node(req.end.pose, req.mode)
+            start_node = res1[0]
+            end_node = res2[0]
 
-        path = self.map_graph.make_path(itm_near_start_point.int_marker.name, itm_near_end_point.int_marker.name)
-
-        rospy.loginfo("path : {}".format(path))
-        if path is None:
+        tmp_path = self.map_graph.make_path(start_node.int_marker.name, end_node.int_marker.name)
+        if tmp_path is None:
             return MakePathResponse(None)
 
-        for _itm in path:
-            map_itm = self.get_itm(_itm)
-            itms_list_resp.append(ItM(name=_itm, nature=map_itm.nature, pose=map_itm.int_marker.pose))
-        return MakePathResponse(itms_list_resp)
+        for i in range(len(tmp_path)):
+            map_node = self.get_node(tmp_path[i])
+            path.nodes.append(Node(name=map_node.int_marker.name, pose=map_node.int_marker.pose))
+            if i < len(tmp_path) - 1:
+                map_edge = self.get_edge(node_1_name=tmp_path[i], node_2_name=tmp_path[i+1])
+                path.edges.append(Edge(first_node=map_edge.node_1_name, second_node=map_edge.node_2_name,
+                                        weight=map_edge.edge_weight, is_crossing_door=map_edge.is_crossing_door))
 
-    def find_nearest_itm(self, initial_point, mode, min_distance=0):
+        rospy.loginfo("Nodes : {}".format(tmp_path))
+        rospy.loginfo("Edges : {}".format(path.edges))
+        return MakePathResponse(path)
+
+    def find_nearest_node(self, initial_point, mode, min_distance=0):
         """
-        Returns the nearest MapItM object of the `initial_point` in the map
-        :param mode: "EUCLIDIAN" to measure the euclidian distance between two points, otherwise it measure the
+        Returns the nearest MapNode object of the `initial_point` in the map
+        :param mode: "euclidian" to measure the euclidian distance between two points, otherwise it measure the
         distance taking account of obstacles
-        :param min_distance: The minimal distance the MapItM object will be accepted
+        :param min_distance: The minimal distance the MapNode object will be accepted
         :param initial_point: A geometry_msgs/Pose
-        :return: The MapItM object and its distance from the point
+        :return: The MapNode object and its distance from the point
         """
         _list = []
 
         if mode == "euclidian":
-            for _itm in self.itms_list:
+            for _node in self.nodes_list:
                 point1 = [initial_point.position.x, initial_point.position.y, initial_point.position.z]
-                point2 = [_itm.int_marker.pose.position.x, _itm.int_marker.pose.position.y,
-                          _itm.int_marker.pose.position.z]
+                point2 = [_node.int_marker.pose.position.x, _node.int_marker.pose.position.y,
+                          _node.int_marker.pose.position.z]
                 dist = distance.euclidean(point1, point2)
                 if min_distance < dist:
-                    _list.append([_itm, dist])
+                    _list.append([_node, dist])
         else:
             ps1 = self.convert_to_pose_stamped(initial_point)
-            for _itm in self.itms_list:
-                ps2 = self.convert_to_pose_stamped(_itm.int_marker.pose)
+            for _node in self.nodes_list:
+                ps2 = self.convert_to_pose_stamped(_node.int_marker.pose)
                 dist = self.measure_distance(ps1, ps2)
                 if min_distance < dist:
-                    _list.append([_itm, dist])
+                    _list.append([_node, dist])
 
         _list.sort(key=lambda _list: _list[1])
         return _list[0]
 
-    def check_itms_on_path(self, _path):
-        max_dist = 2
-        itms_on_path = []
+    def check_nodes_on_path(self, _path):
+        """
+        Finds MapNodes on the path in parameter
+        :param _path: List of points in the map
+        :return:
+        """
+        max_dist_around_point = 2
+        nodes_on_path = []
+
         for i in range(0, len(_path), 20):
             min_dist = float('inf')
-            itm_close = None
+            node_close = None
 
             pt = _path[i]
-            x_min = pt.pose.position.x - max_dist
-            x_max = pt.pose.position.x + max_dist
-            y_min = pt.pose.position.y - max_dist
-            y_max = pt.pose.position.y + max_dist
+            x_min = pt.pose.position.x - max_dist_around_point
+            x_max = pt.pose.position.x + max_dist_around_point
+            y_min = pt.pose.position.y - max_dist_around_point
+            y_max = pt.pose.position.y + max_dist_around_point
 
-            for _itm in self.itms_list:
-                x = _itm.int_marker.pose.position.x
-                y = _itm.int_marker.pose.position.y
+            for node_ in self.nodes_list:
+                x = node_.int_marker.pose.position.x
+                y = node_.int_marker.pose.position.y
                 if x_min < x < x_max and y_min < y < y_max:
-                    ps2 = self.convert_to_pose_stamped(_itm.int_marker.pose)
-                    dist = self.measure_distance(pt, ps2)
+                    pt2 = self.convert_to_pose_stamped(node_.int_marker.pose)
+                    dist = self.measure_distance(pt, pt2)
                     if dist < min_dist:
-                        itm_close = _itm
+                        node_close = node_
                         min_dist = dist
-            if itm_close is not None:
-                itms_on_path.append([itm_close, min_dist])
-        return itms_on_path
+
+            if node_close is not None and node_close not in nodes_on_path:
+                nodes_on_path.append(node_close)
+
+        return nodes_on_path
 
     def measure_distance(self, point_1, point_2):
         """
@@ -500,7 +528,7 @@ class MapMng:
         :param point_2: A geometry_msgs/PoseStamped
         :return: The distance between the two points avoiding obstacles
         """
-        _path = self.path(point_1, point_2, 0.0)
+        _path = self.path_service_proxy(point_1, point_2, 0.0)
         if len(_path.plan.poses) == 0:
             return float("inf")
         elif len(_path.plan.poses) == 1:
@@ -533,28 +561,30 @@ class MapMng:
     # Save/update and file modification methods
     def int_mark_process_feedback(self, feedback):
         """
-        Method called when the InteractiveMarkerServer receives the information that an Interactive Marker is being moved
+        Method called when the InteractiveMarkerServer receives the information that a MapNode is being moved
         :param feedback: InteractiveMarkerFeedback
         """
-        temp_int_mark = self.get_itm(feedback.marker_name)
-        for edge in temp_int_mark.list_of_edges:
+        tmp_node = self.get_node(feedback.marker_name)
+        for edge in tmp_node.list_of_edges:
             edge.update_edge(feedback)
-            self.edge_pub.publish(edge.edge_marker)
-        self.server.applyChanges()
-        self.save_file(temp_int_mark, "MapItM")
+            self.edge_server.erase(edge.edge_int_marker)
+            self.edge_server.insert(edge.edge_int_marker)
+            self.edge_server.applyChanges()
+
+        self.node_server.applyChanges()
+        self.save_file(tmp_node, "MapNode")
 
     def save_file(self, obj, type_of_obj):
         """
-        Save/update the data file of the MapItM or Edge object
-        :param obj: The MapItM or Edge object that will be saved in a file
-        :param type_of_obj: Type of the object parameter, either MapItM or Edge
+        Save/update the data file of the MapNode or MapEdge object
+        :param obj: The MapNode or MapEdge object that will be saved in a file
+        :param type_of_obj: Type of the object parameter, either MapNode or MapEdge
         """
-        if type_of_obj == "MapItM":
+        if type_of_obj == "MapNode":
             with open(self.CONFIG_PATH + obj.int_marker.name + '.json', 'w+') as f:
-                pose_dict = {"type": "MapItM",
+                pose_dict = {"type": "MapNode",
                              "name": obj.int_marker.name,
                              "description": obj.int_marker.description,
-                             "nature": obj.nature,
                              "color": self.get_key_from_value(COLORS, obj.marker.color),
                              "pose": {
                                  "position": {
@@ -573,13 +603,13 @@ class MapMng:
                 f.write(json.dumps(pose_dict, indent=4, sort_keys=True))
 
         elif type_of_obj == "MapEdge":
-            with open(self.CONFIG_PATH + obj.name + '.json', 'w+') as f:
+            with open(self.CONFIG_PATH + obj.edge_int_marker.name + '.json', 'w+') as f:
                 pose_dict = {"type": "MapEdge",
-                             "name": obj.name,
-                             "id": obj.edge_marker.id,
-                             "start marker": obj.int_mark_1.name,
-                             "end marker": obj.int_mark_2.name,
-                             "weight": obj.edge_weight
+                             "name": obj.edge_int_marker.name,
+                             "first node": obj.node_1_name,
+                             "second node": obj.node_2_name,
+                             "weight": obj.edge_weight,
+                             "is_crossing_door": str(obj.is_crossing_door)
                              }
                 f.write(json.dumps(pose_dict, indent=4))
 
@@ -588,48 +618,48 @@ class MapMng:
 
     def created_file(self, filepath):
         """
-        Method called when a file is created to check if it's a MapItM or MapEdge data file. Then it checks if the object
+        Method called when a file is created to check if it's a MapNode or MapEdge data file. Then it checks if the object
         of the corresponding type exists and if not it calls the method to create it
         :param filepath: Path of the file created
         """
         with open(filepath, 'r') as f:
             data = eval(json.dumps(json.load(f)))
-            if data['type'] == "MapItM":
-                if self.get_itm(data['name']) is None:
-                    self.add_itm(data, True)
+            if data['type'] == "MapNode":
+                if self.get_node(data['name']) is None:
+                    self.add_node(data, True)
             elif data['type'] == "MapEdge":
-                if self.get_edge(data['id']) is None:
-                    self.load_edge(data)
+                if self.get_edge(edge_name=data['name']) is None:
+                    self.add_edge(data['first node'], data['second node'], data['name'], data['weight'], self.convert_to_bool(data['is_crossing_door']))
             else:
                 rospy.logwarn("Data type not recognized")
 
     def modified_file(self, filepath):
         """
-        Method called when a file is modified to check if it's a MapItM or MapEdge data file. Then it retrieves the corresponding
+        Method called when a file is modified to check if it's a MapNode or MapEdge data file. Then it retrieves the corresponding
         object in the list of the map manager and checks if it needs an update on the map
         :param filepath: Path of the file modified
         """
         with open(filepath, 'r') as f:
             data = eval(json.dumps(json.load(f)))
-            if data['type'] == "MapItM":
-                temp_itm = self.get_itm(data['name'])
-                if not self.compare_data(temp_itm.int_marker.description, data['description']):
-                    temp_itm.int_marker.description = data['description']
-                if not self.compare_data(temp_itm.int_marker.pose.position.x, data['pose']['position']['x']):
-                    temp_itm.int_marker.pose.position.x = data['pose']['position']['x']
-                if not self.compare_data(temp_itm.int_marker.pose.position.y, data['pose']['position']['y']):
-                    temp_itm.int_marker.pose.position.y = data['pose']['position']['y']
-                if not self.compare_data(temp_itm.int_marker.pose.position.z, data['pose']['position']['z']):
-                    temp_itm.int_marker.pose.position.z = data['pose']['position']['z']
-                if not self.compare_data(temp_itm.int_marker.pose.orientation.x, data['pose']['orientation']['x']):
-                    temp_itm.int_marker.pose.orientation.x = data['pose']['orientation']['x']
-                if not self.compare_data(temp_itm.int_marker.pose.orientation.y, data['pose']['orientation']['y']):
-                    temp_itm.int_marker.pose.orientation.y = data['pose']['orientation']['y']
-                if not self.compare_data(temp_itm.int_marker.pose.orientation.z, data['pose']['orientation']['z']):
-                    temp_itm.int_marker.pose.orientation.z = data['pose']['orientation']['z']
-                if not self.compare_data(temp_itm.int_marker.pose.orientation.w, data['pose']['orientation']['w']):
-                    temp_itm.int_marker.pose.orientation.w = data['pose']['orientation']['w']
-                self.server.applyChanges()
+            if data['type'] == "MapNode":
+                temp_node = self.get_node(data['name'])
+                if not self.compare_data(temp_node.int_marker.description, data['description']):
+                    temp_node.int_marker.description = data['description']
+                if not self.compare_data(temp_node.int_marker.pose.position.x, data['pose']['position']['x']):
+                    temp_node.int_marker.pose.position.x = data['pose']['position']['x']
+                if not self.compare_data(temp_node.int_marker.pose.position.y, data['pose']['position']['y']):
+                    temp_node.int_marker.pose.position.y = data['pose']['position']['y']
+                if not self.compare_data(temp_node.int_marker.pose.position.z, data['pose']['position']['z']):
+                    temp_node.int_marker.pose.position.z = data['pose']['position']['z']
+                if not self.compare_data(temp_node.int_marker.pose.orientation.x, data['pose']['orientation']['x']):
+                    temp_node.int_marker.pose.orientation.x = data['pose']['orientation']['x']
+                if not self.compare_data(temp_node.int_marker.pose.orientation.y, data['pose']['orientation']['y']):
+                    temp_node.int_marker.pose.orientation.y = data['pose']['orientation']['y']
+                if not self.compare_data(temp_node.int_marker.pose.orientation.z, data['pose']['orientation']['z']):
+                    temp_node.int_marker.pose.orientation.z = data['pose']['orientation']['z']
+                if not self.compare_data(temp_node.int_marker.pose.orientation.w, data['pose']['orientation']['w']):
+                    temp_node.int_marker.pose.orientation.w = data['pose']['orientation']['w']
+                self.node_server.applyChanges()
             elif data['type'] == "MapEdge":
                 pass
             else:
@@ -649,21 +679,16 @@ class MapMng:
 
     def deleted_file(self):
         """
-        Method called when a file is deleted to check if it's a MapItM or MapEdge data file. Then it retrieves the corresponding
-        object in the list of the map manager and deletes it if it still exists
+        Method called when a file is deleted to check if it's a MapNode or MapEdge data file. Then it retrieves the corresponding
+        object in the list of the map manager and deletes it
         """
-        for itm_ in self.itms_list:
-            if not os.path.exists(self.CONFIG_PATH + itm_.int_marker.name + ".json"):
-                rospy.loginfo("File of interactive marker {} does not exist, deleting the marker...".format(itm_.int_marker.name))
-                self.map_graph.delete_node_on_graph(itm_.int_marker.name)
-                for edge in reversed(itm_.list_of_edges):
-                    self.delete_edge(edge)
-                self.server.erase(itm_.int_marker.name)
-                self.server.applyChanges()
-                self.itms_list.remove(itm_)
+        for node_ in self.nodes_list:
+            if not os.path.exists(self.CONFIG_PATH + node_.int_marker.name + ".json"):
+                rospy.loginfo("File of node {} does not exist, deleting it...".format(node_.int_marker.name))
+                self.delete_node(node_)
         for edge_ in self.edges_list:
-            if not os.path.exists(self.CONFIG_PATH + edge_.name + ".json"):
-                rospy.loginfo("File of edge {} does not exist, deleting the edge...".format(edge_.name))
+            if not os.path.exists(self.CONFIG_PATH + edge_.edge_int_marker.name + ".json"):
+                rospy.loginfo("File of edge {} does not exist, deleting it...".format(edge_.edge_int_marker.name))
                 self.delete_edge(edge_)
 
 
@@ -717,8 +742,7 @@ class MyHandler(FileSystemEventHandler):
 
 class MapGraph:
     """
-    Class for the creation of a Graph object, which contains a Networkx graph that draws all the Interactive Markers as
-    nodes and the Edges as edges
+    Class for the creation of a Graph object, which contains a Networkx graph that draws all the Nodes and Edges
     """
 
     def __init__(self):
@@ -727,7 +751,7 @@ class MapGraph:
         """
         self.graph = nx.Graph()
 
-    def add_marker_to_graph(self, _node):
+    def add_node_to_graph(self, _node):
         """
         Add a node `_node` to the graph
         :param _node: Name of the node to be added (usually it's the name of the interactive marker)
@@ -767,18 +791,18 @@ class MapGraph:
         :param node_2: Second node of the graph
         :return: True if they are connected, False otherwise
         """
-        for n in self.graph.neighbors(node_2):
-            if node_1 == n:
+        for n in self.graph.neighbors(node_1):
+            if node_2 == n:
                 return True
         return False
 
     def make_path(self, start_node, end_node):
         """
-        Method that returns the list of nodes (interactive markers) to go from `start_node` to `end_node`.
+        Method that returns the list of nodes to go from `start_node` to `end_node`.
         It uses the Dijkstra algorithm from the Networkx package.
         :param start_node: The starting node of the path
         :param end_node: The ending node of the path
-        :return: The list of the interactive markers between the start and the end if there's no errors
+        :return: The list of the nodes between the start and the end if there's no errors
         """
         try:
             path = nx.dijkstra_path(self.graph, start_node, end_node)
@@ -800,51 +824,49 @@ class MapGraph:
             rospy.logwarn("Weight of edge {}-{} set to {}".format(_node1, _node2, self.graph[_node1][_node2]['weight']))
 
 
-class MapItM:
+class MapNode:
     """
-    Class to create a MapItM object containing an Interactive Marker from the visualization_msgs package and some
+    Class to create a MapNode object containing an Interactive Marker from the visualization_msgs package and some
     other attributes and methods
     """
-    current_id = 0  # ID of markers that increments each time a MapItM object is created, so they're unique
+    current_id = 0  # ID of markers that increments each time a MapNode object is created, so they're unique
     map_mng = None
 
     def __init__(self, data, loaded_data=False):
         """
-        Initialization of a new MapItM object
+        Initialization of a new MapNode object
         """
         self.int_marker = InteractiveMarker()
         self.marker = Marker()
         self.menu_handler = MenuHandler()
-        self.list_of_edges = []  # List of all Edge objects associated with the MapItM object
-        self.nature = "None"
-        self.handle = None
-        
-        self.make_inter_marker(data, loaded_data)
+        self.list_of_edges = []  # List of all Edge objects associated with the MapNode object
+
+        self.make_int_marker(data, loaded_data)
 
     @staticmethod
     def init_map_mng(map_mng_):
-        MapItM.map_mng = map_mng_
+        MapNode.map_mng = map_mng_
 
-    def make_inter_marker(self, data, loaded_data=False):
+    def make_int_marker(self, data, loaded_data=False):
         """
-        Create the Interactive Marker, its controls and saves it in a file if it is a new MapItM object
+        Create the Interactive Marker, its controls and saves it in a file if it is a new MapNode object
         :param data: The data used to create the Interactive Marker, either a Point Stamped message or a dictionnary
         containing the position of the marker and its other attributes
-        :param loaded_data: Tells the method which type of data is received, False if it is a new MapItM object so `data`
+        :param loaded_data: Tells the method which type of data is received, False if it is a new MapNode object so `data`
         is a Point Stamped message and True if it is a loaded data from the json/ directory so `data` is a dictionnary
         """
         self.int_marker.header.frame_id = MAP_FRAME
-        self.int_marker.scale = 1
+        self.int_marker.scale = 0.7
 
         if not loaded_data:
-            self.int_marker.name = "ItM" + str(MapItM.current_id)
+            self.int_marker.name = "Node_" + str(MapNode.current_id)
             self.int_marker.description = self.int_marker.name
             self.int_marker.header.stamp = data.header.stamp
             self.int_marker.pose.position = data.point
-            self.int_marker.pose.position.z = 0.001
+            self.int_marker.pose.position.z = 0.005
             self.int_marker.pose.orientation.w = 1.0
             self.make_marker("GREEN")
-            MapItM.current_id += 1
+            MapNode.current_id += 1
         else:
             self.int_marker.name = data['name']
             self.int_marker.description = data['description']
@@ -857,11 +879,10 @@ class MapItM:
             self.int_marker.pose.orientation.z = data['pose']['orientation']['z']
             self.int_marker.pose.orientation.w = data['pose']['orientation']['w']
             self.make_marker(data['color'])
-            self.nature = data['nature']
-            if int(data['name'][3:]) >= MapItM.current_id:
-                MapItM.current_id = int(data['name'][3:]) + 1
-        self.add_menu()
+            if int(data['name'][5:]) >= MapNode.current_id:
+                MapNode.current_id = int(data['name'][5:]) + 1
         self.make_controls()
+        self.add_menu()
 
     def make_controls(self):
         """
@@ -928,111 +949,138 @@ class MapItM:
         """
         Add a menu to the Interactve marker that allows some actions on it
         """
-        self.menu_handler.insert("Create an edge", callback=MapItM.map_mng.create_edge)
-        self.menu_handler.insert("Delete all edges", callback=MapItM.map_mng.delete_all_edges)
-        self.menu_handler.insert("Delete marker", callback=MapItM.map_mng.delete_itm)
-        marker_nature = self.menu_handler.insert("Type of marker")
-        first_type = self.menu_handler.insert("None", parent=marker_nature, callback=MapItM.map_mng.change_marker_nature)
-        second_type = self.menu_handler.insert("Door", parent=marker_nature, callback=MapItM.map_mng.change_marker_nature)
+        self.menu_handler.insert("Create an edge", callback=self.create_edge)
+        self.menu_handler.insert("Delete all edges", callback=self.delete_all_edges)
+        self.menu_handler.insert("Delete marker", callback=self.delete_self)
 
-        self.menu_handler.setCheckState(first_type, MenuHandler.UNCHECKED)
-        self.menu_handler.setCheckState(second_type, MenuHandler.UNCHECKED)
+    def create_edge(self, feedback):
+        if MapNode.map_mng.first_node_selected is None:
+            MapNode.map_mng.first_node_selected = self
+        else:
+            MapNode.map_mng.add_edge(MapNode.map_mng.first_node_selected.int_marker.name, self.int_marker.name)
+            MapNode.map_mng.first_node_selected = None
 
-        if self.nature == "None":
-            self.menu_handler.setCheckState(first_type, MenuHandler.CHECKED)
-            self.handle = first_type
-        elif self.nature == "Door":
-            self.menu_handler.setCheckState(second_type, MenuHandler.CHECKED)
-            self.handle = second_type
+    def delete_all_edges(self, feedback):
+        MapNode.map_mng.delete_all_edges(self)
+
+    def delete_self(self, feedback):
+        MapNode.map_mng.delete_node(self)
 
 
 class MapEdge:
     """
-    Class to create a MapEdge object which represents a link between two interactive markers
+    Class to create a MapEdge object which is an Interactive marker between two Interactive marker MapNodes
     """
     current_id = 0  # Id given to the next edge created if it is a new edge, increasing by one so all edges have a different Id
+    map_mng = None
 
-    def __init__(self, _itm1, _itm2, _id=None, _weight=1.0):
-        """
-        Initialization of a new edge created by the two Interactive Markers objects `_itm1` and `_itm2`
-        :param _itm1: The first node of the edge
-        :param _itm2: The second node of the edge
-        :param _id: If the edge is loaded it already has an Id. Otherwise the value of `_id` is None so the method will take the value of current_id
-        """
+    @staticmethod
+    def init_map_mng(map_mng_):
+        MapEdge.map_mng = map_mng_
 
-        self.int_mark_1 = _itm1
-        self.int_mark_2 = _itm2
+    def __init__(self, node_1, node_2, _name=None, _weight=1.0, _is_crossing_door=False):
+        """
+        Initialization of a new edge created by the two MapNode objects
+        :param node_1: The first MapNode of the edge
+        :param node_2: The second MapNode of the edge
+        :param _name: Name of the edge if it's a loaded edge
+        """
+        self.edge_int_marker = InteractiveMarker()
         self.edge_marker = Marker()
+        self.menu_handler = MenuHandler()
         self.start_point = Point()
         self.end_point = Point()
 
-        # Marker line
-        self.edge_marker.header.frame_id = MAP_FRAME
-        self.edge_marker.header.stamp = rospy.Time.now()
-        self.edge_marker.ns = "Edge"
-        self.edge_marker.type = Marker.LINE_STRIP
-        self.edge_marker.action = Marker.ADD
-        self.edge_marker.color = COLORS["RED"]
-        self.edge_marker.scale.x = 0.1
+        # Create the interactive marker, marker, controls and menu
+        self.make_int_marker(_name)
+        self.make_marker(node_1.int_marker.pose.position, node_2.int_marker.pose.position)
+        self.make_control()
+        self.make_menu()
 
-        # Starting point of the line
-        self.start_point.x = self.int_mark_1.pose.position.x
-        self.start_point.y = self.int_mark_1.pose.position.y
-        self.start_point.z = self.int_mark_1.pose.position.z
-        self.edge_marker.points.append(self.start_point)
+        # Some attributes
+        self.edge_weight = _weight
+        self.is_crossing_door = _is_crossing_door
+        self.node_1_name = node_1.int_marker.name
+        self.node_2_name = node_2.int_marker.name
+        if self.is_crossing_door:
+            self.menu_handler.setCheckState(self.door_menu, MenuHandler.CHECKED)
 
-        # Ending point of the line
-        self.end_point.x = self.int_mark_2.pose.position.x
-        self.end_point.y = self.int_mark_2.pose.position.y
-        self.end_point.z = self.int_mark_2.pose.position.z
-        self.edge_marker.points.append(self.end_point)
+    def make_int_marker(self, _name):
+        self.edge_int_marker.header.frame_id = MAP_FRAME
+        self.edge_int_marker.header.stamp = rospy.Time.now()
+        self.edge_int_marker.scale = 0.1
 
-        if _id is None:
+        if _name is None:
             # New edge
-            self.edge_marker.id = MapEdge.current_id
+            self.edge_int_marker.name = "Edge_" + str(MapEdge.current_id)
             MapEdge.current_id += 1
         else:
             # It's an edge being loaded
-            self.edge_marker.id = _id
-            if _id >= MapEdge.current_id:
+            self.edge_int_marker.name = _name
+            if int(_name[5:]) >= MapEdge.current_id:
                 # It sets the current_id to the maximum id of the loaded edges
-                MapEdge.current_id = _id + 1
+                MapEdge.current_id = int(_name[5:]) + 1
 
-        self.edge_weight = _weight
-        self.name = self.edge_marker.ns + '_' + str(self.edge_marker.id)
+    def make_control(self):
+        # interactive control containing the menu and the marker
+        control = InteractiveMarkerControl()
+        control.name = "marker"
+        control.interaction_mode = InteractiveMarkerControl.BUTTON
+        control.always_visible = True
+        control.markers.append(self.edge_marker)
+        self.edge_int_marker.controls.append(control)
+
+    def make_marker(self, first_point, second_point):
+        # Marker line
+        self.edge_marker.type = Marker.LINE_STRIP
+        self.edge_marker.color = COLORS["RED"]
+        self.edge_marker.scale.x = self.edge_int_marker.scale
+
+        # Starting point of the line
+        self.start_point = first_point
+        self.edge_marker.points.append(self.start_point)
+
+        # Ending point of the line
+        self.end_point = second_point
+        self.edge_marker.points.append(self.end_point)
+
+        return self.edge_marker
+
+    def make_menu(self):
+        self.menu_handler.insert("Delete edge", callback=self.delete_edge)
+        self.door_menu = self.menu_handler.insert("Door", callback=MapEdge.map_mng.change_door_mode)
+        self.menu_handler.setCheckState(self.door_menu, MenuHandler.UNCHECKED)
 
     def update_edge(self, feedback):
         """
-        Update the position of the edge according to the two markers that defines it.
-        This method is called by the processFeedback method of the interactive marker
-        :param feedback: The interactive marker moving on the map
+        Update the position of the edge according to the two nodes that defines it.
+        This method is called by the processFeedback method of the node
+        :param feedback: The node moving on the map
         """
-        if feedback.marker_name == self.int_mark_1.name:
+        if feedback.marker_name == self.node_1_name:
             self.edge_marker.points[0] = feedback.pose.position
-        elif feedback.marker_name == self.int_mark_2.name:
+        elif feedback.marker_name == self.node_2_name:
             self.edge_marker.points[1] = feedback.pose.position
         else:
-            rospy.logerr("Error, the marker is not associated with the edge")
+            rospy.logerr("Error, the node is not associated with the edge")
 
-    def delete_edge(self):
-        """
-        Delete the marker of the edge from the map
-        """
-        self.edge_marker.action = 2
+    def delete_edge(self, feedback):
+        MapEdge.map_mng.delete_edge(self)
 
 
 if __name__ == '__main__':
-    rospy.init_node("pepper_interactive_marker")
+    rospy.init_node("pepper_map_manager")
 
     default_value = 'roomv1/'
     dir_name = rospy.get_param("~confPath", default_value)
     _cfgpath = os.path.join(os.path.dirname(__file__), '../json/') + dir_name
     if not os.path.isdir(_cfgpath):
-        rospy.logerr("Directory {} does not exist, create it before executing the program".format(_cfgpath))
-    else:
-        if _cfgpath[-1] != "/":
-            _cfgpath = _cfgpath + "/"
-        manager = MapMng(_cfgpath)
-        time.sleep(1)  # HACK - Wait for ROS Subscribers to listen to the edge publisher
-        manager.load()
-        rospy.spin()
+        rospy.logwarn("Directory does not exist, creating it...")
+        os.mkdir(_cfgpath)
+        rospy.loginfo("Directory created")
+    if _cfgpath[-1] != "/":
+        _cfgpath = _cfgpath + "/"
+    manager = MapMng(_cfgpath)
+    time.sleep(1)  # HACK - Wait for ROS Subscribers to listen to the edge publisher
+    manager.load()
+    rospy.spin()
