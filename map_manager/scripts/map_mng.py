@@ -1071,9 +1071,9 @@ class MapEdge:
 if __name__ == '__main__':
     rospy.init_node("pepper_map_manager")
 
-    default_value = 'roomv1/'
+    default_value = rospy.get_param("/map_file")
     dir_name = rospy.get_param("~confPath", default_value)
-    _cfgpath = os.path.join(os.path.dirname(__file__), '../json/') + dir_name
+    _cfgpath = os.path.join(os.path.dirname(__file__), '../json/') + os.path.splitext(os.path.basename(dir_name))[0]
     if not os.path.isdir(_cfgpath):
         rospy.logwarn("Directory does not exist, creating it...")
         os.mkdir(_cfgpath)
@@ -1081,6 +1081,5 @@ if __name__ == '__main__':
     if _cfgpath[-1] != "/":
         _cfgpath = _cfgpath + "/"
     manager = MapMng(_cfgpath)
-    time.sleep(1)  # HACK - Wait for ROS Subscribers to listen to the edge publisher
     manager.load()
     rospy.spin()

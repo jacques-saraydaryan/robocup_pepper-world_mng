@@ -7,7 +7,7 @@ import os
 from map_mng import MapMng
 from map_manager.srv import *
 from geometry_msgs.msg import Pose, Point
-from robocup_msgs.msg import ItM, Edge
+from robocup_msgs.msg import Node, Edge
 
 
 class TestIntMark(unittest.TestCase):
@@ -21,7 +21,7 @@ class TestIntMark(unittest.TestCase):
         self.manager.load()
 
     def test_find_near_itm(self):
-        self.manager.find_nearest_itm([2.0, 0.5, 0.0], "")
+        self.manager.find_nearest_node([2.0, 0.5, 0.0], "")
 
     def test_send_graph(self):
         rospy.wait_for_service('/pepper/send_graph')
@@ -29,14 +29,14 @@ class TestIntMark(unittest.TestCase):
         self.graph_obj = graph_handle()
 
     def test_get_itm(self):
-        rospy.wait_for_service('/pepper/get_itm')
-        handle = rospy.ServiceProxy('/pepper/get_itm', GetItM)
-        self.itm = handle("ItM0")
+        rospy.wait_for_service('/pepper/get_node')
+        handle = rospy.ServiceProxy('/pepper/get_node', GetNode)
+        self.node = handle("Node_0")
         rospy.spin()
 
     def test_add_itm_srv(self):
-        rospy.wait_for_service('/pepper/add_itm')
-        handle = rospy.ServiceProxy('/pepper/add_itm', AddItM)
+        rospy.wait_for_service('/pepper/add_node')
+        handle = rospy.ServiceProxy('/pepper/add_node', AddNode)
         pose1 = Pose()
         pose1.position.x = -5.0
         pose1.position.y = 6.0
@@ -45,15 +45,15 @@ class TestIntMark(unittest.TestCase):
         pose1.orientation.y = 0.0
         pose1.orientation.z = 0.0
         pose1.orientation.w = 0.0
-        itm = ItM(name="ItM5", nature="None", pose=pose1)
-        self.success = handle(itm)
+        node = Node(name="ItM5", nature="None", pose=pose1)
+        self.success = handle(node)
         rospy.spin()
 
     def test_add_edge_srv(self):
 
         rospy.wait_for_service('/pepper/add_edge')
         handle = rospy.ServiceProxy('/pepper/add_edge', AddEdge)
-        success = handle(Edge(first_node="ItM0", second_node="ItM3"))
+        success = handle(Edge(first_node="ItM0", second_node="ItM3", weight=1, is_crossing_door=False))
         rospy.spin()
 
     def test_obstacles(self):
