@@ -35,7 +35,7 @@ class Mm:
     _activateTF_service = ""
     _tflistener = ""
     _tfPublisherRunning=True
-    _reloadItAfterPublishingTf=True
+    _reloadItAfterPublishingTf=False
     _broadcastTfPeriod = 2
 
     def __init__(self,conf_path):
@@ -67,6 +67,8 @@ class Mm:
     #  Get interest points from memory
     ####
     def getInterestPoint(self, req):
+        rospy.loginfo("Reloading itP list")
+        self.loadInterestPoint()
         rospy.loginfo("in the get interest point service. itP name = %s", req.itP_name)
         return self._mapIP_Position[str(req.itP_name)] # return of type InterestPoint
 
@@ -120,7 +122,7 @@ class Mm:
     def loadInterestPoint(self):
         dirs = os.listdir(self.CONFIG_PATH)
         #Reload IP in the map
-        self._mapIP_Position={}
+        #self._mapIP_Position={}
         # This would print all the files and directories
         for fileName in dirs:
 
