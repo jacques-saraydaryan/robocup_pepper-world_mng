@@ -59,7 +59,7 @@ First it searches the nearest MapNode from the starting position and the one fro
 "Mode" can have 3 values :
 - euclidian : search the nearest MapNode by comparing the euclidian distance of all of them to the point, it doesn't take obstacles in account.
 - ros_plan : same as euclidian but it uses the ROS make plan service (see below in the Subscribed services section) to calculate the distance, so it takes obstacles in account.
-- fast_ros_plan : it makes one plan between the start and the end positions using the ROS make plan service, then it browse the list of points returned by the service and look for MapNodes in an area around the points (for now it's a square of 2m x 2m)
+- one_ros_plan : it makes one plan between the start and the end positions using the ROS make plan service, then it browse the list of points returned by the service and look for MapNodes in an area around the points (for now it's a square of 2m x 2m)
 
 Once the two MapNodes have been found, it uses the djisktra algorithm on the Networkx graph to find the intermediary MapNodes.
 Finally it sends a Graph message containing these MapNodes and the MapEdges that link them.

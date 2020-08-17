@@ -426,7 +426,7 @@ class MapMng:
         """
         path = Graph()
 
-        if req.mode == "fast_ros_plan":
+        if req.mode == "one_ros_plan":
             ros_make_plan = self.path_service_proxy(req.start, req.end, 0.0)
             result = self.check_nodes_on_path(ros_make_plan.plan.poses)
             start_node = result[0]
