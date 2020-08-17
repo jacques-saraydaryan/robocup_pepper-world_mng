@@ -1,0 +1,8 @@
+{
+    "name": "Edge_0", 
+    "weight": 1, 
+    "first node": "Node_0", 
+    "second node": "Node_1", 
+    "type": "MapEdge", 
+    "is_crossing_door": "False"
+}

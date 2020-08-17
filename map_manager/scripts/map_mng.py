@@ -3,7 +3,6 @@
 
 import json
 import os
-import time
 import fnmatch
 import networkx as nx
 import numpy as np
@@ -41,9 +40,8 @@ class MapMng:
 
     def __init__(self, _cfgpath):
         """
-        Initializes the server for the management of interactive markers, the publisher for the display of edges, the
-        subscriber to listen to the Clicked Point tool of RViz, an observer and an event handler to watch the
-        modification of the files and a graph of the interactive markers and edges
+        Initializes the servers for the management of interactive markers and edges, the subscriber to listen to the
+        Clicked Point tool of RViz, an observer and an event handler to watch the modification of the files and a graph of the interactive markers and edges
         """
         self.CONFIG_PATH = _cfgpath  # Path where data files will be saved and loaded
         rospy.loginfo("Path : {}".format(self.CONFIG_PATH))
