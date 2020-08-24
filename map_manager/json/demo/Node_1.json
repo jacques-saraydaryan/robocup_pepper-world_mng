@@ -1,0 +1,19 @@
+{
+    "color": "GREEN", 
+    "description": "Node_1", 
+    "name": "Node_1", 
+    "pose": {
+        "orientation": {
+            "w": 1.0, 
+            "x": 0.0, 
+            "y": 0.0, 
+            "z": 0.0
+        }, 
+        "position": {
+            "x": 2.8527703285217285, 
+            "y": -5.20541524887085, 
+            "z": 0.004999999888241291
+        }
+    }, 
+    "type": "MapNode"
+}

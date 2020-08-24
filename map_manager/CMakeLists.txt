@@ -10,25 +10,32 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   robocup_msgs
   message_generation
+
 )
 
 
 ## Generate messages in the 'msg' folder
-# add_message_files(
+#add_message_files(
 #   FILES
-#   Message1.msg
-#   Message2.msg
-# )
+#)
 
 ## Generate services in the 'srv' folder
  add_service_files(
    FILES
+   AddNode.srv
+   AddEdge.srv
    activateTF_service.srv
    getitP_service.srv
    getOrient_service.srv
+   GetNode.srv
+   GotoPoint.srv
+   MakePath.srv
+   ModifyNode.srv
    saveitP_service.srv
    saveOrient_service.srv
    saveitP_base_link_service.srv
+   SendGraph.srv
+   UpdateGraph.srv
  )
 
 ## Generate actions in the 'action' folder

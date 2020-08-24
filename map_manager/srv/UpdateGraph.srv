@@ -1,0 +1,5 @@
+string act
+string node
+int64 weight
+---
+bool success
