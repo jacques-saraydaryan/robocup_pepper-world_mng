@@ -9,7 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   geometry_msgs
   robocup_msgs
-#  message_generation
+  message_generation
 )
 
 
@@ -21,10 +21,15 @@ find_package(catkin REQUIRED COMPONENTS
 # )
 
 ## Generate services in the 'srv' folder
-#add_service_files(
-#  FILES
-#  myservice.srv
-#)
+add_service_files(
+  FILES
+  activateTF_service.srv
+   getitP_service.srv
+   getOrient_service.srv
+   saveitP_service.srv
+   saveOrient_service.srv
+   saveitP_base_link_service.srv
+)
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -34,8 +39,8 @@ find_package(catkin REQUIRED COMPONENTS
 # )
 
 ## Generate added messages and services with any dependencies listed here
-#generate_messages(
-#  DEPENDENCIES
-#  std_msgs geometry_msgs robocup_msgs
-#)
+generate_messages(
+  DEPENDENCIES
+  std_msgs geometry_msgs robocup_msgs
+)
 

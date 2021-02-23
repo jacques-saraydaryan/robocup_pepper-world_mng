@@ -15,7 +15,9 @@ see ref: [postgis documentation](https://postgis.net/docs/postgis_installation.h
 docker run --name some-postgis -e POSTGRES_PASSWORD=mysecretpassword -d postgis/postgis
 ```
 
-## 1.2 Install pgadmin
+## 1.2a Install pgadmin --> CAUTION LEAD TO CRASH ROS (q5 dependancies prefert docker version)
+
+
 
 - see official doc (https://www.pgadmin.org/download/pgadmin-4-apt/)[https://www.pgadmin.org/download/pgadmin-4-apt/]
 ```
@@ -24,7 +26,12 @@ sudo sh -c 'echo "deb https://ftp.postgresql.org/pub/pgadmin/pgadmin4/apt/$(lsb_
 
 sudo apt install pgadmin4
 ```
+## 1.2b pgadmin docker
 
+```
+docker run -p 80:80 -e 'PGADMIN_DEFAULT_EMAIL=user@domain.com' -e 'PGADMIN_DEFAULT_PASSWORD=SuperSecret' -d dpage/pgadmin4
+```
+- got to localhost:80 into a web browser
 
 ## 1.3 Create database
 - From Pgadmin connect to the local postgis database

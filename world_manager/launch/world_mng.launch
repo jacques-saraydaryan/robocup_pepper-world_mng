@@ -1,0 +1,9 @@
+<launch>
+
+
+  <rosparam file="$(find world_manager)/config/common_world_mng.yaml" />
+      <node pkg="world_manager" type="WorldManagerNode.py" name="WorldManagerNode"  output="screen" >
+  </node>
+ 
+
+</launch>
