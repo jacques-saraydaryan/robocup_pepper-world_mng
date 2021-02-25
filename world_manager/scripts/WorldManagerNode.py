@@ -75,11 +75,12 @@ class WorldManagerNode:
             return
 
     def publishInterestPointTf(self,):
+        thread_name='tf_broacaster'
         while( not rospy.is_shutdown()):
             if  self._node_is_ready and self._tfPublisherRunning:
                 br = tf.TransformBroadcaster()
                 # get all object
-                obj_list = self.postgisDao.select_request("select * from object;")
+                obj_list = self.postgisDao.select_request("select * from object;", thread_safe=True,thread_name=thread_name)
                 for obj in obj_list:
                     br.sendTransform((obj['x'], obj['y'], 0),
                                      (obj['orient_x'], obj['orient_y'],obj['orient_z'],obj['orient_w']),

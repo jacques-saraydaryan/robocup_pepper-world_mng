@@ -35,19 +35,24 @@ class PostGisDao:
                                            user=self.POSTGRES_USER, 
                                            password=self.POSTGRES_USER_PWD)
         self.cursor = self.connection.cursor()
+        self._connection_map={}
 
     def create_db(self,sql_file_path):
         # load table schema
         self._execute(open(sql_file_path, "r").read(),commit=True)
 
-    def select_request(self, sql_request):
+    def select_request(self, sql_request,thread_safe=False,thread_name=""):
         data_list=[]
         try:
-            self._execute(sql_request)
-            for obj in self.cursor:
+            current_cursor=self.cursor
+            if not thread_safe:
+                self._execute(sql_request)
+            else:
+                current_cursor = self.thread_safe_execution(thread_name,sql_request)
+            for obj in current_cursor:
                 data={}
                 for i in range(0,len(obj)):
-                    current_column_name = self.cursor.description[i].name
+                    current_column_name = current_cursor.description[i].name
                     if current_column_name == 'coordinate':
                         point= wkb.loads(obj[i], hex=True)
                         data['x']=point.x
@@ -60,19 +65,22 @@ class PostGisDao:
         return data_list
 
 
-    def add_geo_object(self,id,type,x,y,z,ttl,type_name="",confidence="0.0",orient_x=0,orient_y=0,orient_z=0,orient_w=1,json_payload="{}"):
+    def add_geo_object(self,id_ref,type,x,y,z,ttl,type_name="",confidence="0.0",orient_x=0,orient_y=0,orient_z=0,orient_w=1,json_payload="{}"):
 
         # Check if id exist
-        self._execute("select id from object where id ='%s';"%id)
+        try:
+            self._execute("select id from object where id ='%s';"%id_ref)
+        except Exception as err:
+            raise Exception(err)
         data_exist = False
         for id in self.cursor:
             data_exist = True
         if data_exist:
-            std_cmd="UPDATE object SET type='%s',coordinate=ST_SetSRID(ST_MakePoint(%s,%s, %s),4326),ttl=%s,type_name='%s',confidence=%s,orient_x=%s,orient_y=%s,orient_z=%s,orient_w=%s,json_payload='%s';"%(type,x,y,z,ttl,type_name,confidence,orient_x,orient_y,orient_z,orient_w,json_payload)
+            std_cmd="UPDATE object SET type='%s',coordinate=ST_SetSRID(ST_MakePoint(%s,%s, %s),4326),ttl=%s,type_name='%s',confidence=%s,orient_x=%s,orient_y=%s,orient_z=%s,orient_w=%s,json_payload='%s' WHERE id ='%s';"%(type,x,y,z,ttl,type_name,confidence,orient_x,orient_y,orient_z,orient_w,json_payload,id_ref)
             print(std_cmd)
         else:
                 
-            std_cmd="INSERT INTO object (id,type,coordinate,ttl,type_name,confidence,orient_x,orient_y,orient_z,orient_w,json_payload) VALUES ('%s','%s',ST_SetSRID(ST_MakePoint(%s,%s, %s),4326),%s,'%s',%s,%s,%s,%s,%s,'%s')"%(id,type,x,y,z,ttl,type_name,confidence,orient_x,orient_y,orient_z,orient_w,json_payload)
+            std_cmd="INSERT INTO object (id,type,coordinate,ttl,type_name,confidence,orient_x,orient_y,orient_z,orient_w,json_payload) VALUES ('%s','%s',ST_SetSRID(ST_MakePoint(%s,%s, %s),4326),%s,'%s',%s,%s,%s,%s,%s,'%s')"%(id_ref,type,x,y,z,ttl,type_name,confidence,orient_x,orient_y,orient_z,orient_w,json_payload)
             print(std_cmd)
         self._execute(std_cmd,commit=True)
 
@@ -112,13 +120,47 @@ class PostGisDao:
         - @param request: sqt request to execute
         - @param commit: enable commit after request execution
         """
+        self._execute_with_connection(request,self.connection,self.cursor,commit=commit)
+        #try:
+        #    self.cursor.execute(request)
+        #    if(commit):
+        #        self.connection.commit()
+        #except Exception as err:
+        #     self.connection.rollback()
+        #     raise Exception('PostGisDao', err)
+
+    def _execute_with_connection(self,request,connection,cursor,commit=False):
+        """
+        Encapsulate request execution to apply rollback in case of error
+        - @param request: sqt request to execute
+        - @param commit: enable commit after request execution
+        - @param connection: connection to use for the request execution (needed in case of thread usage with a different connection)
+        - @param cursor: the cursor to use with the connection
+        """
         try:
-            self.cursor.execute(request)
-            if(commit):
-                self.connection.commit()
+               cursor.execute(request)
+               if(commit):
+                  connection.commit()
         except Exception as err:
-             self.connection.rollback()
-             raise Exception('PostGisDao', err)
+               connection.rollback()
+               raise Exception('PostGisDao', err)
+
+    def thread_safe_execution(self,thread_connection_name,request,commit=False):
+        th_connection=None
+        cursor=None
+        if thread_connection_name in self._connection_map:
+            th_connection,cursor = self._connection_map[thread_connection_name]
+        else:
+            th_connection = psycopg2.connect(host=self.POSTGRES_IP, 
+                                             port=self.POSTGRES_PORT,
+                                             database=self.POSTGRES_DB_NAME,
+                                             user=self.POSTGRES_USER, 
+                                             password=self.POSTGRES_USER_PWD)
+            cursor=th_connection.cursor()
+            self._connection_map[thread_connection_name]=(th_connection,cursor)
+        self._execute_with_connection(request,th_connection,cursor,commit=commit)
+        return cursor
+
 
 
 if __name__ == '__main__':
