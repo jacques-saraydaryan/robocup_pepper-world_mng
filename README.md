@@ -25,7 +25,7 @@ The following workflow is done:
 <img src="./img/world_mng_workflow.jpg" alt="RGBD object detection" width="100%"/>
 
 
-THe nodes work are follow:
+The ros nodes work as follow:
 
 
 <img src="./img/mergeStoreData.jpg" alt="Nodes organisation" width="600"/>
