@@ -13,12 +13,17 @@ import tf
 import time
 import json
 import datetime
+from sklearn.cluster import DBSCAN
+from sklearn.preprocessing import StandardScaler,OneHotEncoder
+from sklearn.compose import ColumnTransformer
+import uuid
 
 class WorldManagerNode:
     _node_is_ready = False
     _broadcastTfPeriod = 2
     _tfPublisherRunning = True
     NO_TTL_VALUE =-1
+    DEFAULT_TTL_VALUE = 100
 
     def __init__(self,):
         self.configure_ros()
@@ -40,13 +45,13 @@ class WorldManagerNode:
         # Node configuration
         rospy.init_node('world_mng_node', anonymous=False)
 
-        self._postgres_user = rospy.get_param('/postgres_user', "postgres")
-        self._postgres_user_pwd= rospy.get_param('/postgres_user_pwd', "")
-        self._postgres_db_name= rospy.get_param('/postgres_db_name', "world_mng_db")
-        self._postgres_ip= rospy.get_param('/postgres_ip', "172.17.0.2")
-        self._postgres_port= rospy.get_param('/postgres_port', "5432")
-        self._re_create_db= rospy.get_param('/re_create_db', False)
-        self._broadcastTfPeriod= rospy.get_param('/broadcast_tf_period', 2)
+        self._postgres_user = rospy.get_param('/world_manager/postgres_user', "postgres")
+        self._postgres_user_pwd= rospy.get_param('/world_manager/postgres_user_pwd', "")
+        self._postgres_db_name= rospy.get_param('/world_manager/postgres_db_name', "world_mng_db")
+        self._postgres_ip= rospy.get_param('/world_manager/postgres_ip', "172.17.0.2")
+        self._postgres_port= rospy.get_param('/world_manager/postgres_port', "5432")
+        self._re_create_db= rospy.get_param('/world_manager/re_create_db', False)
+        self._broadcastTfPeriod= rospy.get_param('/world_manager/broadcast_tf_period', 2)
         rospy.loginfo("Param DB:  postgres_user:"+str( self._postgres_user))
         rospy.loginfo("Param DB:  postgres_db_name:"+str( self._postgres_db_name))
         rospy.loginfo("Param DB:  postgres_ip:"+str( self._postgres_ip))
@@ -63,7 +68,9 @@ class WorldManagerNode:
         self._getPoint_service = rospy.Service('get_InterestPoint', getitP_service, self.getInterestPointServiceCallback)
         self._saveitPBaseLink_service = rospy.Service('save_BaseLinkInterestPoint', saveitP_base_link_service, self.saveBaseLinkInterestPointServiceCallback)
         self._activateTF_service = rospy.Service('activate_InterestPointTF', activateTF_service, self.activeTFProviderServiceCallback)
+        self._activateTF_service = rospy.Service('save_Entity', saveEntity_service, self.saveEntityServiceCallback)
 
+        
         self._tflistener = TransformListener()
 
         #start publishing It Tf
@@ -80,9 +87,10 @@ class WorldManagerNode:
             if  self._node_is_ready and self._tfPublisherRunning:
                 br = tf.TransformBroadcaster()
                 # get all object
+                obj_list = []
                 obj_list = self.postgisDao.select_request("select * from object;", thread_safe=True,thread_name=thread_name)
                 for obj in obj_list:
-                    br.sendTransform((obj['x'], obj['y'], 0),
+                    br.sendTransform((obj['x'], obj['y'], obj['z']),
                                      (obj['orient_x'], obj['orient_y'],obj['orient_z'],obj['orient_w']),
                                      rospy.Time(0),
                                      str(obj['id'])+'_TF',
@@ -186,6 +194,32 @@ class WorldManagerNode:
         if(not req.isActivated and not self._tfPublisherRunning):
             rospy.loginfo('[MAP_MANAGER]: Keep tf broadcast disable')
             return []
+
+    def saveEntityServiceCallback (self, req):
+        entity_map={}
+        #gather set of clusters by category
+        for entity in req.entity_list.entityList:
+            if entity.label not in entity_map:
+                entity_map[entity.label]=[]
+            entity_map[entity.label].append(entity) 
+
+
+        #For each entity of the same category
+        # - detect clusters
+        # - on each cluster call object in radius
+        #   - Check if data in cluster needs to be merged to db data
+        #   - Merge new data or create new entry if needed
+        for key in entity_map:
+            current_entity_list=[]
+            current_coord_list=[]
+            for entity in entity_map[key]:
+                current_entity_list.append(entity)
+                current_coord_list.append((entity.pose.position.x,entity.pose.position.y,entity.pose.position.z))
+        
+            self._add_or_update_object(current_entity_list,current_coord_list,key,req.radius)
+            return True
+
+
     
     ######################
     ## INTERNAL TOOLS ############################################
@@ -198,6 +232,135 @@ class WorldManagerNode:
 
     def _float_to_datetime(self,fl):
         return datetime.datetime.fromtimestamp(fl)
+
+    def _add_or_update_object(self, entity_list,coord_list,category,radius):
+        """ Check if a set of object need to update existing data in Db or create new one
+           - @param entity_list: list of entities to add to DB, CAUTIOn ASSUMING THAT ENTITY as attribute 'count' and 'confidence' into payload
+           - @param coord_list: list of coordinate (x,y,z) of the given entities
+           - @param category: category of the list of entities, needed to ask db of data of the same category
+           - @param radius: radius in which entities will update existing data in db (use as eps in dbscan)
+        """
+
+        #Check if needed
+        X = StandardScaler().fit_transform(coord_list)
+        
+        # Dbscan of entity same label eps 2 * radius, min =1
+        # Clusterized data using DBSCAN with x,y,z
+        db = DBSCAN(eps=2 * radius, min_samples=1).fit(X)
+        cluster_index_list={}
+        # gather all entity indices of a same label
+        for i in range(0,len(db.labels_)):
+            if db.labels_[i] not in cluster_index_list:
+                cluster_index_list[db.labels_[i]]=[]
+            cluster_index_list[db.labels_[i]].append(i)
+
+        # compute for each cluster its centroid
+        clusters={}
+        for key_label in cluster_index_list:
+            cluster_size = len(cluster_index_list[key_label])
+            c_x=0
+            c_y=0
+            c_z=0
+            clusters[key_label]={ 'c':(0,0,0),'max_dist_c':0}
+            for coord_index in cluster_index_list[key_label]:
+                c_x = c_x + coord_list[coord_index][0]
+                c_y = c_y + coord_list[coord_index][1]
+                c_z = c_z + coord_list[coord_index][2]
+                #clusters[key_label]['entity_list'].append(buffer_to_process.get_entity(coord_index))
+            avg_c_x=c_x/cluster_size
+            avg_c_y=c_y/cluster_size
+            avg_c_z=c_z/cluster_size
+
+            clusters[key_label]['c']=(avg_c_x,avg_c_y,avg_c_z)
+
+            #compute the max distance to the centroid
+            for coord_index in cluster_index_list[key_label]:
+                c = clusters[key_label]['c']
+                dist_to_c = self.postgisDao._pt_distance(c[0],c[1],c[2],
+                                              coord_list[coord_index][0],coord_list[coord_index][1],coord_list[coord_index][2])
+                if clusters[key_label]['max_dist_c'] < dist_to_c:
+                    clusters[key_label]['max_dist_c'] = dist_to_c
+            
+            # get all data in DB in range of cluster, radius_db =   max_dist_c + radius 
+            c = clusters[key_label]['c']
+            db_data_list = self.postgisDao.get_obj_in_range_in_category_3D(c[0],c[1],c[2],
+                                                             clusters[key_label]['max_dist_c'] +radius,category)
+
+
+            # if no object in DB in range add clusters to DB
+            if len(db_data_list) == 0:
+                for coord_index in cluster_index_list[key_label]:
+                    entity_count = 1 
+                    entity_confidence = 1
+                    try:
+                        entity_count = json.loads(entity_list[coord_index].payload)['count']
+                        entity_confidence = json.loads(entity_list[coord_index].payload)['confidence']
+                    except Exception as e:
+                        print('Could not get count or confidence of entity to update DB, %s'%(e))
+                    uuid_id = uuid.uuid1()
+                    #Create new object
+                    self.postgisDao.add_geo_object(uuid_id,entity_list[coord_index].type,
+                                           coord_list[coord_index][0],coord_list[coord_index][1],coord_list[coord_index][2],
+                                           1,
+                                           entity_list[coord_index].label,entity_confidence,entity_count,
+                                           json_payload=entity_list[coord_index].payload)
+            else:
+
+                for data in db_data_list:
+                    current_db_confidence = data['confidence']
+                    current_db_count = data['count']
+                    current_db_x = data['x']
+                    current_db_y = data['y']
+                    current_db_z = data['z']
+                    is_data_db_updated = False
+                    min_dist_to_data_db = 500
+                    min_dist_to_data_db_index=-1
+
+                    # TODO need to lock an already detected object BD that already merge a sensor cluster
+                    # Make Hungarian repartition with distance between Db objet and detect object as value
+                    
+                    #Find the closes cluster to the current data_db
+                    for coord_index in cluster_index_list[key_label]:
+                        current_distance =self.postgisDao._pt_distance(data['x'],data['y'],data['z'],
+                                                            coord_list[coord_index][0],coord_list[coord_index][1],coord_list[coord_index][2] )
+                        if min_dist_to_data_db > current_distance:
+                            min_dist_to_data_db = current_distance
+                            min_dist_to_data_db_index = coord_index
+
+                    # If the min distance is < radius cluster as to be merged to data_db
+                    if min_dist_to_data_db < radius:
+                        is_data_db_updated = True
+
+                    for coord_index in cluster_index_list[key_label]:
+                        entity_count = 1 
+                        entity_confidence = 1
+                        try:
+                            entity_count = json.loads(entity_list[coord_index].payload)['count']
+                            entity_confidence = json.loads(entity_list[coord_index].payload)['confidence']
+                        except Exception as e:
+                            print('Could not get count or confidence of entity to update DB, %s'%(e))
+
+                        if min_dist_to_data_db_index == coord_index and is_data_db_updated:
+                            #Update current db object values
+                            total_count = current_db_count + entity_count
+                            current_db_x = (current_db_x * current_db_count + coord_list[coord_index][0] * entity_count ) /float(total_count)
+                            current_db_y = (current_db_y * current_db_count + coord_list[coord_index][1] * entity_count ) /float(total_count)
+                            current_db_z = (current_db_z * current_db_count + coord_list[coord_index][2] * entity_count ) /float(total_count)
+                            current_db_confidence = (current_db_confidence * current_db_count + entity_confidence * entity_count) /float(total_count)
+                            current_db_count = total_count
+                        else:
+                            uuid_id= uuid.uuid1()
+                            #Create new object
+                            self.postgisDao.add_geo_object(uuid_id,entity_list[coord_index].type,
+                                               coord_list[coord_index][0],coord_list[coord_index][1],coord_list[coord_index][2],
+                                               1,
+                                               entity_list[coord_index].label,entity_confidence,entity_count,
+                                               json_payload=entity_list[coord_index].payload)
+                    if is_data_db_updated:
+                        #Update existing object
+                        self.postgisDao.add_geo_object(data['id'],data['type'],current_db_x,current_db_y,current_db_z,data['ttl'],
+                                               data['type_name'],current_db_confidence,current_db_count,
+                                               json_payload=data['json_payload'])
 
 def main():
     #""" main function

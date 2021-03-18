@@ -2,6 +2,8 @@ import psycopg2
 #import gdal
 from shapely import wkb
 import os
+import uuid
+import math
 script_dir = os.path.dirname(__file__) #<-- absolute dir the script is in
 
 
@@ -65,7 +67,7 @@ class PostGisDao:
         return data_list
 
 
-    def add_geo_object(self,id_ref,type,x,y,z,ttl,type_name="",confidence="0.0",orient_x=0,orient_y=0,orient_z=0,orient_w=1,json_payload="{}"):
+    def add_geo_object(self,id_ref,type,x,y,z,ttl,type_name="",confidence=0.0,count=1,orient_x=0,orient_y=0,orient_z=0,orient_w=1,json_payload="{}"):
 
         # Check if id exist
         try:
@@ -76,21 +78,46 @@ class PostGisDao:
         for id in self.cursor:
             data_exist = True
         if data_exist:
-            std_cmd="UPDATE object SET type='%s',coordinate=ST_SetSRID(ST_MakePoint(%s,%s, %s),4326),ttl=%s,type_name='%s',confidence=%s,orient_x=%s,orient_y=%s,orient_z=%s,orient_w=%s,json_payload='%s' WHERE id ='%s';"%(type,x,y,z,ttl,type_name,confidence,orient_x,orient_y,orient_z,orient_w,json_payload,id_ref)
+            std_cmd="UPDATE object SET type='%s',coordinate=ST_SetSRID(ST_MakePoint(%s,%s, %s),4326),ttl=%s,type_name='%s',confidence=%s,count=%s,orient_x=%s,orient_y=%s,orient_z=%s,orient_w=%s,json_payload='%s' WHERE id ='%s';"%(type,x,y,z,ttl,type_name,confidence,count,orient_x,orient_y,orient_z,orient_w,json_payload,id_ref)
             print(std_cmd)
         else:
                 
-            std_cmd="INSERT INTO object (id,type,coordinate,ttl,type_name,confidence,orient_x,orient_y,orient_z,orient_w,json_payload) VALUES ('%s','%s',ST_SetSRID(ST_MakePoint(%s,%s, %s),4326),%s,'%s',%s,%s,%s,%s,%s,'%s')"%(id_ref,type,x,y,z,ttl,type_name,confidence,orient_x,orient_y,orient_z,orient_w,json_payload)
+            std_cmd="INSERT INTO object (id,type,coordinate,ttl,type_name,confidence,count,orient_x,orient_y,orient_z,orient_w,json_payload) VALUES ('%s','%s',ST_SetSRID(ST_MakePoint(%s,%s, %s),4326),%s,'%s',%s,%s,%s,%s,%s,%s,'%s')"%(id_ref,type,x,y,z,ttl,type_name,confidence,count,orient_x,orient_y,orient_z,orient_w,json_payload)
             print(std_cmd)
         self._execute(std_cmd,commit=True)
 
     def get_obj_in_range(self,x,y,r):
-        std_cmd="select id,type,ST_x(coordinate),ST_y(coordinate), ttl, type_name, confidence, orient_x, orient_y, orient_z, orient_w,update_date,json_payload from object where ST_DWithin(coordinate, ST_SetSRID(ST_Point(%s, %s), 4326), %s);"%(x,y,r)
+        std_cmd="select id,type,ST_x(coordinate),ST_y(coordinate), ttl, type_name, confidence,count, orient_x, orient_y, orient_z, orient_w,update_date,json_payload from object where ST_DWithin(coordinate, ST_SetSRID(ST_Point(%s, %s), 4326), %s);"%(x,y,r)
         #print(std_cmd)
         self._execute(std_cmd)
         data_list=[]
-        for id,type,x,y,ttl,type_name,confidence,orient_x,orient_y,orient_z,orient_w,update_date,json_payload in self.cursor:
-            data={'id':id,'type':type,'x':x,'y':y,'ttl':ttl,'type_name':type_name,'confidence':confidence,'orient_x':orient_x,'orient_y':orient_y,'orient_z':orient_z,'orient_w':orient_w,'update_date':update_date,'json_payload':json_payload}
+        for id,type,x,y,ttl,type_name,confidence,count,orient_x,orient_y,orient_z,orient_w,update_date,json_payload in self.cursor:
+            data={'id':id,'type':type,'x':x,'y':y,'ttl':ttl,'type_name':type_name,'confidence':confidence,'count':count,'orient_x':orient_x,'orient_y':orient_y,'orient_z':orient_z,'orient_w':orient_w,'update_date':update_date,'json_payload':json_payload}
+            data_list.append(data)
+        return data_list
+
+    def get_obj_in_range_in_category(self,x,y,r, category):
+        std_cmd="select id,type,ST_x(coordinate),ST_y(coordinate), ttl, type_name, confidence,count, orient_x, orient_y, orient_z, orient_w,update_date,json_payload from object where ST_DWithin(coordinate, ST_SetSRID(ST_Point(%s, %s), 4326), %s) and type_name = '%s';"%(x,y,r,category)
+        #print(std_cmd)
+        self._execute(std_cmd)
+        data_list=[]
+        for id,type,x,y,ttl,type_name,confidence,count,orient_x,orient_y,orient_z,orient_w,update_date,json_payload in self.cursor:
+            data={'id':id,'type':type,'x':x,'y':y,'ttl':ttl,'type_name':type_name,'confidence':confidence,'count':count,'orient_x':orient_x,'orient_y':orient_y,'orient_z':orient_z,'orient_w':orient_w,'update_date':update_date,'json_payload':json_payload}
+            data_list.append(data)
+        return data_list
+
+    def get_obj_in_range_in_category_3D(self,x,y,z,r, category):
+        std_cmd="select id,type,ST_x(coordinate),ST_y(coordinate),ST_z(coordinate), ttl, type_name, confidence,count, orient_x, orient_y, orient_z, orient_w,update_date,json_payload"\
+            " from object where ST_3DDWithin( " \
+	                                  "ST_Transform(ST_GeomFromEWKT(coordinate),4326)," \
+	                                  "ST_Transform(ST_GeomFromEWKT('SRID=4326;POINT(%s %s %s)'),4326),"\
+	                                  " %s )"\
+                                    "and type_name = '%s';"%(x,y,z,r,category)
+        #print(std_cmd)
+        self._execute(std_cmd)
+        data_list=[]
+        for id,type,x,y,z,ttl,type_name,confidence,count,orient_x,orient_y,orient_z,orient_w,update_date,json_payload in self.cursor:
+            data={'id':id,'type':type,'x':x,'y':y,'z':z,'ttl':ttl,'type_name':type_name,'confidence':confidence,'count':count,'orient_x':orient_x,'orient_y':orient_y,'orient_z':orient_z,'orient_w':orient_w,'update_date':update_date,'json_payload':json_payload}
             data_list.append(data)
         return data_list
 
@@ -98,14 +125,15 @@ class PostGisDao:
         #std_cmd="select object.id,object.type,ST_x(object.coordinate),ST_y(object.coordinate), object.ttl, '\
         #    object.type_name, object.confidence,  object.orient_x, object.orient_y, object.orient_z, object.orient_w '\
         #    from object join room on ST_WITHIN(object.coordinate, room.poly) where room.room='%s';"%(room_name);
-        std_cmd="select object.id,object.type,ST_x(object.coordinate),ST_y(object.coordinate), object.ttl, object.type_name, object.confidence,  object.orient_x, object.orient_y, object.orient_z, object.orient_w, object.update_date, object.json_payload from object join room on ST_WITHIN(object.coordinate, room.poly) where room.room='%s';"%(room_name);
+        std_cmd="select object.id,object.type,ST_x(object.coordinate),ST_y(object.coordinate), object.ttl, object.type_name, object.confidence,object.count,  object.orient_x, object.orient_y, object.orient_z, object.orient_w, object.update_date, object.json_payload from object join room on ST_WITHIN(object.coordinate, room.poly) where room.room='%s';"%(room_name);
         #print(std_cmd)
         self._execute(std_cmd)
         data_list=[]
-        for id,type,x,y,ttl,type_name,confidence,orient_x,orient_y,orient_z,orient_w,update_date, json_payload in self.cursor:
-            data={'id':id,'type':type,'x':x,'y':y,'ttl':ttl,'type_name':type_name,'confidence':confidence,'orient_x':orient_x,'orient_y':orient_y,'orient_z':orient_z,'orient_w':orient_w,'update_date':update_date,'json_payload':json_payload}
+        for id,type,x,y,ttl,type_name,confidence,count,orient_x,orient_y,orient_z,orient_w,update_date, json_payload in self.cursor:
+            data={'id':id,'type':type,'x':x,'y':y,'ttl':ttl,'type_name':type_name,'confidence':confidence,'count':count,'orient_x':orient_x,'orient_y':orient_y,'orient_z':orient_z,'orient_w':orient_w,'update_date':update_date,'json_payload':json_payload}
             data_list.append(data)
         return data_list
+    
 
 
     def load_raster_into_PostGIS(self, image_name):
@@ -145,6 +173,9 @@ class PostGisDao:
                connection.rollback()
                raise Exception('PostGisDao', err)
 
+    def _pt_distance(self,x1,y1,z1,x2,y2,z2):
+        return math.sqrt(pow(x2-x1,2) + pow(y2-y1,2) +pow(z2-z1,2))
+
     def thread_safe_execution(self,thread_connection_name,request,commit=False):
         th_connection=None
         cursor=None
@@ -165,7 +196,7 @@ class PostGisDao:
 
 if __name__ == '__main__':
     # True means data base is re created
-    dao=PostGisDao(re_create_db=False)
+    dao=PostGisDao(re_create_db=True)
 
     try:
         #load converted map geo tiff to db

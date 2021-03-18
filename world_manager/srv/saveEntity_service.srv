@@ -1,0 +1,4 @@
+robocup_msgs/EntityList entity_list
+float32 radius
+---
+bool success

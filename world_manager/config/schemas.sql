@@ -33,6 +33,7 @@ CREATE TABLE public."object"
     ttl real NOT NULL,
     confidence real,
     update_date timestamp without time zone NOT NULL DEFAULT (now() at time zone 'utc'),
+    count double precision,
     json_payload character varying COLLATE pg_catalog."default",
     CONSTRAINT "object_pkey" PRIMARY KEY (id)
 );

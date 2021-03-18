@@ -29,6 +29,7 @@ add_service_files(
    saveitP_service.srv
    saveOrient_service.srv
    saveitP_base_link_service.srv
+   saveEntity_service.srv
 )
 
 ## Generate actions in the 'action' folder

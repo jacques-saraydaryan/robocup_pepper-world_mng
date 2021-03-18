@@ -1,0 +1,15 @@
+convert_2d_to_3d:
+    display_marker : True
+    filter_class : "*"
+    target_frame : "map"
+    source_frame : "kinect_depth_link"
+    pcl_topic : "/kinect/depth/points"
+    pixel_radius: 10 # number of pixel arround a given coordinate to compute average distance from pcl
+    bbox_time_threshold: 0.2 # time limit between the received bouding box and the current time after which packet is dropped
+    service_name: "convert_2d_to_3d_1" #name of the service, could be overrided if multiple node instances are needed
+    buffer_size: 1000
+    buffer_ttl: 10 #in seconds
+    dbscan_eps_value: 0.2 #for DBSCAN to find clusters inside buffer
+    dbscan_min_samples:  2 #min number of elt to create cluster with DBSCAN inside buffer
+    db_radius_to_merge : 0.2 # distance to merge found clusters and elt inside db (calling service of world_manager with this parameter)
+    

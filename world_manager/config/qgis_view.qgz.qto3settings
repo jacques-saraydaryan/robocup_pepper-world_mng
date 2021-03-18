@@ -1,0 +1,161 @@
+{
+  "LAYERS": [
+    {
+      "geomType": 1,
+      "layerId": "object_08793768_6025_46ec_b02a_24ff58e18a0e",
+      "name": "object",
+      "properties": {
+        "checkBox_Clickable": true,
+        "checkBox_Clip": true,
+        "checkBox_ExportAttrs": false,
+        "checkBox_Visible": true,
+        "comboBox_Label": null,
+        "comboBox_ObjectType": "Box",
+        "comboBox_altitudeMode": null,
+        "fieldExpressionWidget_altitude": "\"count\"",
+        "labelHeightWidget": {
+          "comboData": 0,
+          "comboText": "Absolute",
+          "editText": "1",
+          "type": 6
+        },
+        "radioButton_AllFeatures": true,
+        "radioButton_Expression": true,
+        "styleWidget0": {
+          "comboData": 1,
+          "comboText": "Feature style",
+          "editText": "",
+          "type": 2
+        },
+        "styleWidget1": {
+          "comboData": 1,
+          "comboText": "Feature style",
+          "editText": "",
+          "type": 5
+        },
+        "styleWidget2": {
+          "comboData": null,
+          "comboText": "Expression",
+          "editText": "0.2564",
+          "type": 1
+        },
+        "styleWidget3": {
+          "comboData": null,
+          "comboText": "Expression",
+          "editText": "0.2564",
+          "type": 1
+        },
+        "styleWidget4": {
+          "comboData": null,
+          "comboText": "Expression",
+          "editText": "0.2564",
+          "type": 1
+        },
+        "styleWidget5": {}
+      },
+      "visible": true
+    },
+    {
+      "geomType": 3,
+      "layerId": "room_0b041fd0_b336_4412_b5a6_ded71c18c0c4",
+      "name": "room",
+      "properties": {
+        "checkBox_Clickable": true,
+        "checkBox_Clip": true,
+        "checkBox_ExportAttrs": false,
+        "checkBox_Visible": true,
+        "comboBox_Label": null,
+        "comboBox_ObjectType": "Polygon",
+        "comboBox_altitudeMode": null,
+        "fieldExpressionWidget_altitude": "0",
+        "labelHeightWidget": {
+          "comboData": 0,
+          "comboText": "Absolute",
+          "editText": "1",
+          "type": 6
+        },
+        "radioButton_Expression": true,
+        "radioButton_IntersectingFeatures": true,
+        "styleWidget0": {
+          "comboData": 1,
+          "comboText": "Feature style",
+          "editText": "",
+          "type": 2
+        },
+        "styleWidget1": {
+          "comboData": 1,
+          "comboText": "Feature style",
+          "editText": "",
+          "type": 5
+        },
+        "styleWidget2": {},
+        "styleWidget3": {},
+        "styleWidget4": {},
+        "styleWidget5": {}
+      },
+      "visible": false
+    },
+    {
+      "geomType": 0,
+      "layerId": "map_92b5b609_e0a8_4d06_b4b0_e9202ba0393b",
+      "name": "map",
+      "properties": {
+        "checkBox_Clickable": true,
+        "checkBox_Clip": false,
+        "checkBox_Frame": false,
+        "checkBox_Shading": true,
+        "checkBox_Sides": true,
+        "checkBox_Surroundings": false,
+        "checkBox_TransparentBackground": false,
+        "checkBox_Visible": true,
+        "checkBox_Wireframe": false,
+        "colorButton_Color": "0x000000",
+        "comboBox_ClipLayer": "room_0b041fd0_b336_4412_b5a6_ded71c18c0c4",
+        "comboBox_TextureSize": 1024,
+        "horizontalSlider_DEMSize": 1,
+        "lineEdit_ImageFile": "",
+        "radioButton_MapCanvas": true,
+        "spinBox_Opacity": 100,
+        "spinBox_Roughening": 1,
+        "spinBox_Size": 3,
+        "toolButton_EdgeColor": "0x000000",
+        "toolButton_SideColor": "0xccbbaa",
+        "toolButton_WireframeColor": "0x000000"
+      },
+      "visible": false
+    },
+    {
+      "geomType": 0,
+      "layerId": "FLAT",
+      "name": "Flat Plane",
+      "properties": {
+        "checkBox_Clickable": true,
+        "checkBox_Clip": false,
+        "checkBox_Frame": false,
+        "checkBox_Shading": true,
+        "checkBox_Sides": true,
+        "checkBox_Surroundings": false,
+        "checkBox_TransparentBackground": false,
+        "checkBox_Visible": true,
+        "checkBox_Wireframe": false,
+        "colorButton_Color": "0x000000",
+        "comboBox_ClipLayer": "room_0b041fd0_b336_4412_b5a6_ded71c18c0c4",
+        "comboBox_TextureSize": 1024,
+        "horizontalSlider_DEMSize": 2,
+        "lineEdit_ImageFile": "",
+        "radioButton_MapCanvas": true,
+        "spinBox_Opacity": 100,
+        "spinBox_Roughening": 1,
+        "spinBox_Size": 3,
+        "toolButton_EdgeColor": "0x000000",
+        "toolButton_SideColor": "0xccbbaa",
+        "toolButton_WireframeColor": "0x000000"
+      },
+      "visible": true
+    }
+  ],
+  "OPT": {},
+  "OutputFilename": "",
+  "Template": "3DViewer.html",
+  "Title": "qgis_view"
+}
