@@ -37,6 +37,10 @@ class EntityMergeMng:
         # Else nothing to do 
         return {}
         
+    def reset_buffers(self):
+        for i in range (0, len(self.buffer_entity_list)):
+            self.buffer_entity_list[i].reset()
+        
         
     def _process_buffer(self):
         # Switch buffer to process data

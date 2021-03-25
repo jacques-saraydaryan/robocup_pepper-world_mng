@@ -1,0 +1,6 @@
+int32  register_or_grap_mode # 0 : register, 1: grasp
+string[] category_filter_tag_list
+int32 min_3d_frame_nb #only for grasp mode, specify the number of 3d point collecte before broacasting tf
+---
+
+

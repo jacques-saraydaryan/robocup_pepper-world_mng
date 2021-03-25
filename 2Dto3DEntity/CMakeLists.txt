@@ -22,6 +22,7 @@ find_package(catkin REQUIRED COMPONENTS
  add_service_files(
    FILES
    get3Dfrom2D.srv
+   SwitchMode.srv
  )
 
   generate_messages(
