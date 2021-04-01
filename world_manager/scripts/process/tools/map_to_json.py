@@ -26,6 +26,7 @@ class map_to_json():
         #json_obj=json.loads(json_str)
         with open(self.JSON_PATH+"/"+self.JSON_FILE_NAME, "w") as file:
             json.dump(json_str, file)
+            rospy.loginfo("%s file successfully created, please close this node"%self.JSON_FILE_NAME)
         
 
 if __name__ == '__main__':

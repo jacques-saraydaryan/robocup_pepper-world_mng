@@ -49,5 +49,33 @@ CREATE EXTENSION postgis_raster;
 ```
 
 
-# 1.3 Installation of QGIS
+# 2 Installation of QGIS
 follown the ref (https://www.qgis.org/fr/site/forusers/alldownloads.html)[https://www.qgis.org/fr/site/forusers/alldownloads.html]
+
+
+# 3 Create geottif from Ros map
+- Start a ros core
+```
+roscore
+```
+- publish current map
+```
+rosrun map_server map_server map.yaml
+```
+
+- got to the tools repository
+```
+ roscd world_manager/scripts/process/tools/
+```
+
+- transform map topic content to map.json
+```
+python map_to_json.py
+```
+- Close the programm when the following message appear `map.json file successfully created, please close this node`
+
+- Convert the json map to geotiff, execute the following command
+```
+python3 msg_to_geotiff.py  ./map.json '../../tmp/map.gtiff'
+```
+- the `map.gtiff` is created and can be added to QGIS
