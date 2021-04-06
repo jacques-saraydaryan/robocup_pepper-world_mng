@@ -9,7 +9,7 @@ script_dir = os.path.dirname(__file__) #<-- absolute dir the script is in
 
 class PostGisDao:
     POSTGRES_USER = "postgres"
-    POSTGRES_USER_PWD = "astro4Student"
+    POSTGRES_USER_PWD = "myPwd"
     POSTGRES_DB_NAME ="world_mng_db"
     POSTGRES_IP="172.17.0.2"
     POSTGRES_PORT="5432"
@@ -22,6 +22,13 @@ class PostGisDao:
                     user=POSTGRES_USER_PWD,
                     pwd=POSTGRES_USER_PWD,
                     re_create_db=False):
+                    
+        self.POSTGRES_IP=host
+        self.POSTGRES_PORT=port
+        self.POSTGRES_DB_NAME=db_name
+        self.POSTGRES_USER=user
+        self.POSTGRES_USER_PWD=pwd
+
         self.configure()
 
         if re_create_db:

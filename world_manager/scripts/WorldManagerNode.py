@@ -68,7 +68,7 @@ class WorldManagerNode:
         self._getPoint_service = rospy.Service('get_InterestPoint', getitP_service, self.getInterestPointServiceCallback)
         self._saveitPBaseLink_service = rospy.Service('save_BaseLinkInterestPoint', saveitP_base_link_service, self.saveBaseLinkInterestPointServiceCallback)
         self._activateTF_service = rospy.Service('activate_InterestPointTF', activateTF_service, self.activeTFProviderServiceCallback)
-        self._activateTF_service = rospy.Service('save_Entity', saveEntity_service, self.saveEntityServiceCallback)
+        self._saveEntity_service = rospy.Service('save_Entity', saveEntity_service, self.saveEntityServiceCallback)
 
         
         self._tflistener = TransformListener()
