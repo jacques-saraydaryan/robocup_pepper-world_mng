@@ -4,7 +4,7 @@ import rospy
 import thread
 from process.PostGisDao import PostGisDao
 from rospy_message_converter import message_converter, json_message_converter
-from robocup_msgs.msg import InterestPoint #, Order, OrderInterest
+from robocup_msgs.msg import InterestPoint, EntityList, Entity #, Order, OrderInterest
 from geometry_msgs.msg import Pose
 from std_srvs.srv import Empty
 from world_manager.srv import *
@@ -69,6 +69,9 @@ class WorldManagerNode:
         self._saveitPBaseLink_service = rospy.Service('save_BaseLinkInterestPoint', saveitP_base_link_service, self.saveBaseLinkInterestPointServiceCallback)
         self._activateTF_service = rospy.Service('activate_InterestPointTF', activateTF_service, self.activeTFProviderServiceCallback)
         self._saveEntity_service = rospy.Service('save_Entity', saveEntity_service, self.saveEntityServiceCallback)
+
+        self._searchEntityInRoom_service = rospy.Service('search_Entity_in_room', select_object_in_room_service, self.searchEntityInRoomServiceCallback)
+        self._searchEntityInRange_service = rospy.Service('search_Entity_in_range', select_object_in_range_service, self.searchEntityInRangeServiceCallback)
 
         
         self._tflistener = TransformListener()
@@ -219,7 +222,56 @@ class WorldManagerNode:
             self._add_or_update_object(current_entity_list,current_coord_list,key,req.radius)
             return True
 
+    def searchEntityInRoomServiceCallback(self, req):
+        room = req.room
+        category_filter= req.category_filter
+        confidence_filter = req.min_confidence_filter
+        #Call the database with given parameters
+        data_list = self.postgisDao.get_all_object_in_room(room)
+        
+        entityList = EntityList()
+        entityList.entityList=[]
+        for obj in data_list:
+            #FIXME Add filter on last update
+            if obj['confidence']>=confidence_filter:
+                if obj['type_name'] in category_filter or '*' in category_filter:
+                    current_entity=self._db_obj_to_entity(obj)
+                    entityList.entityList.append(current_entity)
+        return entityList
 
+    def searchEntityInRangeServiceCallback(self, req):
+        x= req.current_pose.position.x
+        y= req.current_pose.position.y
+        z= req.current_pose.position.z
+        range_distance = req.range
+        category_filter= req.category_filter
+        confidence_filter = req.min_confidence_filter
+
+        entityList = EntityList()
+        entityList.entityList=[]
+
+        if '*' in category_filter:
+            #Call the database with given parameters
+            #FIXME distance is computed only through x,y, results could be different
+            #from get_obj_in_range_in_category_3D methods
+            data_list = self.postgisDao.get_obj_in_range(x,y,range_distance)
+            for obj in data_list:
+                    #FIXME Add filter on last update
+                    if obj['confidence']>=confidence_filter:
+                        current_entity=self._db_obj_to_entity(obj)
+                        entityList.entityList.append(current_entity)
+        else:
+           
+            for category in category_filter:
+                #Call the database with given parameters
+                data_list_c = self.postgisDao.get_obj_in_range_in_category_3D(x,y,z,
+                                                                     range_distance,category)
+                for obj in data_list_c:
+                    #FIXME Add filter on last update
+                    if obj['confidence']>=confidence_filter:
+                        current_entity=self._db_obj_to_entity(obj)
+                        entityList.entityList.append(current_entity)
+        return entityList
     
     ######################
     ## INTERNAL TOOLS ############################################
@@ -232,6 +284,26 @@ class WorldManagerNode:
 
     def _float_to_datetime(self,fl):
         return datetime.datetime.fromtimestamp(fl)
+
+    def _db_obj_to_entity(self,db_obj):
+        current_entity=Entity()
+        current_pose=Pose()
+        #{'id':id,'type':type,'x':x,'y':y,'ttl':ttl,'type_name':type_name,'confidence':confidence,'count':count,'orient_x':orient_x,'orient_y':orient_y,'orient_z':orient_z,'orient_w':orient_w,'update_date':update_date,'json_payload':json_payload}
+        current_pose.position.x=db_obj['x']
+        current_pose.position.y=db_obj['y']
+        current_pose.position.z=db_obj['z']
+        current_pose.orientation.x=db_obj['orient_x']
+        current_pose.orientation.y=db_obj['orient_y']
+        current_pose.orientation.z=db_obj['orient_z']
+        current_pose.orientation.w=db_obj['orient_w']
+
+        current_entity.pose=current_pose
+        current_entity.uuid=db_obj['id']
+        current_entity.type=db_obj['type_name']
+        current_entity.type=db_obj['type_name']
+        #diameter is not currently supported in DB
+        current_entity.payload=db_obj['json_payload']
+        return current_entity
 
     def _add_or_update_object(self, entity_list,coord_list,category,radius):
         """ Check if a set of object need to update existing data in Db or create new one

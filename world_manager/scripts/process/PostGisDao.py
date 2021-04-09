@@ -9,7 +9,7 @@ script_dir = os.path.dirname(__file__) #<-- absolute dir the script is in
 
 class PostGisDao:
     POSTGRES_USER = "postgres"
-    POSTGRES_USER_PWD = "myPwd"
+    POSTGRES_USER_PWD = "pwd"
     POSTGRES_DB_NAME ="world_mng_db"
     POSTGRES_IP="172.17.0.2"
     POSTGRES_PORT="5432"
@@ -19,7 +19,7 @@ class PostGisDao:
     def __init__(self,host=POSTGRES_IP,
                     port=POSTGRES_PORT,
                     db_name=POSTGRES_DB_NAME,
-                    user=POSTGRES_USER_PWD,
+                    user=POSTGRES_USER,
                     pwd=POSTGRES_USER_PWD,
                     re_create_db=False):
                     
@@ -94,12 +94,12 @@ class PostGisDao:
         self._execute(std_cmd,commit=True)
 
     def get_obj_in_range(self,x,y,r):
-        std_cmd="select id,type,ST_x(coordinate),ST_y(coordinate), ttl, type_name, confidence,count, orient_x, orient_y, orient_z, orient_w,update_date,json_payload from object where ST_DWithin(coordinate, ST_SetSRID(ST_Point(%s, %s), 4326), %s);"%(x,y,r)
+        std_cmd="select id,type,ST_x(coordinate),ST_y(coordinate),ST_z(coordinate), ttl, type_name, confidence,count, orient_x, orient_y, orient_z, orient_w,update_date,json_payload from object where ST_DWithin(coordinate, ST_SetSRID(ST_Point(%s, %s), 4326), %s);"%(x,y,r)
         #print(std_cmd)
         self._execute(std_cmd)
         data_list=[]
-        for id,type,x,y,ttl,type_name,confidence,count,orient_x,orient_y,orient_z,orient_w,update_date,json_payload in self.cursor:
-            data={'id':id,'type':type,'x':x,'y':y,'ttl':ttl,'type_name':type_name,'confidence':confidence,'count':count,'orient_x':orient_x,'orient_y':orient_y,'orient_z':orient_z,'orient_w':orient_w,'update_date':update_date,'json_payload':json_payload}
+        for id,type,x,y,z,ttl,type_name,confidence,count,orient_x,orient_y,orient_z,orient_w,update_date,json_payload in self.cursor:
+            data={'id':id,'type':type,'x':x,'y':y,'z':z,'ttl':ttl,'type_name':type_name,'confidence':confidence,'count':count,'orient_x':orient_x,'orient_y':orient_y,'orient_z':orient_z,'orient_w':orient_w,'update_date':update_date,'json_payload':json_payload}
             data_list.append(data)
         return data_list
 
@@ -132,12 +132,12 @@ class PostGisDao:
         #std_cmd="select object.id,object.type,ST_x(object.coordinate),ST_y(object.coordinate), object.ttl, '\
         #    object.type_name, object.confidence,  object.orient_x, object.orient_y, object.orient_z, object.orient_w '\
         #    from object join room on ST_WITHIN(object.coordinate, room.poly) where room.room='%s';"%(room_name);
-        std_cmd="select object.id,object.type,ST_x(object.coordinate),ST_y(object.coordinate), object.ttl, object.type_name, object.confidence,object.count,  object.orient_x, object.orient_y, object.orient_z, object.orient_w, object.update_date, object.json_payload from object join room on ST_WITHIN(object.coordinate, room.poly) where room.room='%s';"%(room_name);
+        std_cmd="select object.id,object.type,ST_x(object.coordinate),ST_y(object.coordinate),ST_z(object.coordinate), object.ttl, object.type_name, object.confidence,object.count,  object.orient_x, object.orient_y, object.orient_z, object.orient_w, object.update_date, object.json_payload from object join room on ST_WITHIN(object.coordinate, room.poly) where room.room='%s';"%(room_name);
         #print(std_cmd)
         self._execute(std_cmd)
         data_list=[]
-        for id,type,x,y,ttl,type_name,confidence,count,orient_x,orient_y,orient_z,orient_w,update_date, json_payload in self.cursor:
-            data={'id':id,'type':type,'x':x,'y':y,'ttl':ttl,'type_name':type_name,'confidence':confidence,'count':count,'orient_x':orient_x,'orient_y':orient_y,'orient_z':orient_z,'orient_w':orient_w,'update_date':update_date,'json_payload':json_payload}
+        for id,type,x,y,z,ttl,type_name,confidence,count,orient_x,orient_y,orient_z,orient_w,update_date, json_payload in self.cursor:
+            data={'id':id,'type':type,'x':x,'y':y,'z':z,'ttl':ttl,'type_name':type_name,'confidence':confidence,'count':count,'orient_x':orient_x,'orient_y':orient_y,'orient_z':orient_z,'orient_w':orient_w,'update_date':update_date,'json_payload':json_payload}
             data_list.append(data)
         return data_list
     
@@ -203,7 +203,7 @@ class PostGisDao:
 
 if __name__ == '__main__':
     # True means data base is re created
-    dao=PostGisDao(re_create_db=True)
+    dao=PostGisDao(re_create_db=False)
 
     try:
         #load converted map geo tiff to db

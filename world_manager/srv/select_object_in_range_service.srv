@@ -1,0 +1,11 @@
+# rosservice call /search_Entity_in_range '{"current_pose":{"position":{"x":0,"y":0,"z":0},"orientation":{"x":0,"y":0,"z":0,"w":1}},"category_filter":["TABLE","CHAIR"],"min_confidence_filter":0.0, "range":5.0}'
+geometry_msgs/Pose current_pose #pose in /map frameId
+float32 range #in meter
+# use '*' fro all object
+string[] category_filter
+# user None for all
+time last_update_filter
+# use 0.0 for all 
+float32 min_confidence_filter
+---
+robocup_msgs/EntityList entity_list
