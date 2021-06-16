@@ -102,6 +102,7 @@ class merge_register_data:
         entity_list = msg.entityList
 
         #process current entity (add to buffer)
+
         for entity in entity_list:
             #check if process is needed
             with self.mergeProcessMng_lock:
@@ -183,7 +184,7 @@ class merge_register_data:
                     entity_list.entityList.append(ref_entity)
                 
                 #FIXME TO REMOVE LOG
-                #rospy.loginfo(entity_list)
+                #rospy.logwarn(entity_list)
                 with self._process_mode_lock:           
                         if self._process_mode == self.PROCESS_MODE_REGISTRATION:
                             self._save_update_entity_service(entity_list,self._db_radius_to_merge)

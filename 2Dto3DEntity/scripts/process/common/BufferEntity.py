@@ -44,3 +44,14 @@ class BufferEntity:
             return 0
         else:
             return diff_time
+
+    def display_content(self):
+        # to do iterate on entity_buffer sum the label and display sumup
+        log_count_label_map={}
+        for key in self.entity_buffer:
+            current_entity=self.entity_buffer[key]
+            if current_entity.label in log_count_label_map:
+                log_count_label_map[current_entity.label] +=1
+            else:
+                log_count_label_map[current_entity.label] = 1
+        return log_count_label_map

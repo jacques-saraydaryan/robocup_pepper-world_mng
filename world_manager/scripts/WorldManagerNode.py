@@ -201,8 +201,10 @@ class WorldManagerNode:
     def saveEntityServiceCallback (self, req):
         entity_map={}
         #gather set of clusters by category
+        #FIXME what happen if 2 clusters with same label ?????????????
         for entity in req.entity_list.entityList:
             if entity.label not in entity_map:
+
                 entity_map[entity.label]=[]
             entity_map[entity.label].append(entity) 
 
@@ -220,7 +222,7 @@ class WorldManagerNode:
                 current_coord_list.append((entity.pose.position.x,entity.pose.position.y,entity.pose.position.z))
         
             self._add_or_update_object(current_entity_list,current_coord_list,key,req.radius)
-            return True
+        return True
 
     def searchEntityInRoomServiceCallback(self, req):
         room = req.room

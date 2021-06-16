@@ -45,6 +45,10 @@ class EntityMergeMng:
     def _process_buffer(self):
         # Switch buffer to process data
         buffer_to_process = self.buffer_entity_list[self._current_buffer_indice] 
+        print("----------------------- Current Buffer ------------------")
+ 
+        print(buffer_to_process.display_content())
+        print("------------------------------------- ------------------")
 
         if buffer_to_process.size() == 0:
             #reset current buffer, clear buffer, reset TTL
@@ -68,6 +72,9 @@ class EntityMergeMng:
 
         # Clusterized data using DBSCAN with x,y,z,category (one dimension per category --> OneHotEncoder)
         db = DBSCAN(eps=self.DBSCAN_EPS_VALUE, min_samples=self.DBSAN_MIN_SAMPLES).fit(data)
+
+        #print("----------------------- Current DB ------------------")
+        #print(db.labels_)
 
         # Collect coord info from cluster
         cluster_to_key={}
@@ -98,6 +105,10 @@ class EntityMergeMng:
         
         #reset current buffer, clear buffer, reset TTL
         buffer_to_process.reset()
+
+
+        #print("----------------------- Current clusters ------------------")
+        #print(clusters)
         return clusters
 
     def build_clustered_entity(self, clusters):
