@@ -36,16 +36,19 @@ pcl::PointCloud<pcl::PointXYZ> point_pcl;
 sensor_msgs::PointCloud2::ConstPtr current_cloud;
 
 int height;
+const std::string FILTER_ALL_VALUE = "*";
+
 std::string FRAME_ID="";
 std::string filter;
 std::string target_frame,source_frame,pcl_topic;
 std::string service_name;
-int measure_radius;
+int measure_radius,pixel_radius;
 
 bool display_marker=true;
 bool lock=false;
 bool enable_lock_pcl=false;
 double time_diff_threshold;
+float confidence_threshold;
 /*
 * CAN BE TESTED WITH
 * rosservice call /convert_2d_to_3d "{'pose':{'x':10,'y':10}}"
@@ -260,9 +263,14 @@ void getDarkNetBoxesCallback(const darknet_ros_msgs::BoundingBoxes::ConstPtr& ms
 			darknet_ros_msgs::BoundingBox bounding_box=msg->bounding_boxes[i];
 			
 			//FIXME manage filter on class
-			//if(!filter.compare(bounding_box.Class)){
+			if(!filter.compare(bounding_box.Class) || !filter.compare(FILTER_ALL_VALUE)){
 				robocup_msgs::Entity currentEntity;
 				//ROS_INFO("--> in LOOP  getDarkNetBoxesCallback");
+
+
+				if(confidence_threshold> bounding_box.probability){
+					break;
+				}
 				
 				currentEntity.label=bounding_box.Class;
 				//ROS_INFO("--> after Class  getDarkNetBoxesCallback");
@@ -282,7 +290,7 @@ void getDarkNetBoxesCallback(const darknet_ros_msgs::BoundingBoxes::ConstPtr& ms
 				//process 2d ->3d
 				std::string frame_id=msg->header.frame_id;
 				//FIXME to update with ros parameters
-				currentEntity.header.frame_id="map";
+				currentEntity.header.frame_id=target_frame;
 
 
 
@@ -301,7 +309,7 @@ void getDarkNetBoxesCallback(const darknet_ros_msgs::BoundingBoxes::ConstPtr& ms
 				
 
 
-				geometry_msgs::Point resultPoint=processBox(current_pose2d, frame_id, "map", current_stamp,10);
+				geometry_msgs::Point resultPoint=processBox(current_pose2d, frame_id, target_frame, current_stamp,pixel_radius);
 
 
 				currentEntity.type = "Object";
@@ -375,7 +383,7 @@ void getDarkNetBoxesCallback(const darknet_ros_msgs::BoundingBoxes::ConstPtr& ms
 				//	addMarker(m_array,currentEntity.pose.position.x,currentEntity.pose.position.y,currentEntity.pose.position.z,"test",currentEntity.header.frame_id,id);
 				//	object_marker_pub.publish(m_array);
 				//}
-			//}
+			}
 		}
 
 		// PUBLISH DATA
@@ -410,6 +418,7 @@ int main(int argc, char **argv) {
 	    {
 	      filter="person";
 	    }
+
 
 	ROS_INFO("- /convert_2d_to_3d/filter_class: %s", filter.c_str());
 
@@ -455,7 +464,22 @@ int main(int argc, char **argv) {
 	ros::param::get("~/service_name", service_name);
 	ROS_INFO("- /convert_2d_to_3d/service_name: %f", service_name);
 
+ if (!ros::param::get("/convert_2d_to_3d/pixel_radius", pixel_radius))
+	    {
+	      pixel_radius=10;
+	    }
 	
+	ROS_INFO("- /convert_2d_to_3d/pixel_radius: %i", pixel_radius);
+
+	
+	if (!ros::param::get("/convert_2d_to_3d/confidence_threshold", confidence_threshold))
+	    {
+	      confidence_threshold=0.5;
+	    }
+	
+	ROS_INFO("- /convert_2d_to_3d/confidence_threshold: %f", confidence_threshold);
+
+
 
 	
 

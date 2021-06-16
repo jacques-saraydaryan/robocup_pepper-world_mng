@@ -111,7 +111,8 @@ class EntityMergeMng:
         if self.buffer_entity_list[next_indice].size()  == 0:
             self._current_buffer_indice = next_indice
         else:
-            raise Exception('Next Buffer is not empty, could not switch buffer')
+            self.buffer_entity_list[next_indice].reset()
+            raise Exception('Next Buffer is not empty, could not switch buffer buffer has been hard resetted')
         
     def _next_indice(self):
         if self._current_buffer_indice == 0:
