@@ -8,30 +8,32 @@
   <node pkg="world_manager" type="WorldManagerNode.py" name="WorldManagerNode"  output="screen" >
   </node>
 
-  
+<!--
     <node pkg="convert_2d_to_3d" type="convert_2d_to_3d" name="convert_2d_to_3d_node1"  output="screen" >
         <param name="source_frame" value="kinect_depth_link" />
         <param name="pcl_topic" value="/kinect/depth/points" />
         <param name="service_name" value="convert_2d_to_3d_kinect" />  
     </node>
+ -->
   
       <node pkg="convert_2d_to_3d" type="convert_2d_to_3d" name="convert_2d_to_3d_node2"  output="screen" >
           <param name="source_frame" value="camera_depth_link" />
           <param name="pcl_topic" value="/camera/depth/points" />
           <param name="service_name" value="convert_2d_to_3d_asus" />  
       </node>
-
+<!--
       <node pkg="convert_2d_to_3d" type="convert_2d_to_3d" name="convert_2d_to_3d_node3"  output="screen" >
           <param name="source_frame" value="camera_depth_link_2" />
           <param name="pcl_topic" value="/camera_base/depth/points" />
           <param name="service_name" value="convert_2d_to_3d_asus_base" />  
       </node>
+ -->
 
       
-  
+  <!--
   <node pkg="convert_2d_to_3d" type="box_to_entity.py" name="box_to_entity_node"  output="screen" >
   </node>
-  
+  -->
 
     <node pkg="convert_2d_to_3d" type="merge_register_data.py" name="merge_register_data_node"  output="screen" >
   </node>

@@ -114,23 +114,22 @@ void addMarker(visualization_msgs::MarkerArray& m_array,float x, float y, float 
 
 }
 
-bool convert2dto3dCallback(convert_2d_to_3d::get3Dfrom2D::Request  &req,
-             convert_2d_to_3d::get3Dfrom2D::Response &res){
-				 if(current_cloud==0){
-					 return false;
-				 }
-	ROS_DEBUG("Service called");
-	int current_pixel_radius=req.pixel_radius;
+geometry_msgs::Point processBox(geometry_msgs::Pose2D pose, std::string frame_id, std::string target_frame_id, ros::Time time_stamp,int32_t pixel_radius){
+	geometry_msgs::Point resultPoint;
+
+	int current_pixel_radius=pixel_radius;
 	
 	try{
 		lock=true;
 		int pcl_index,x,y,z;
 		pcl::PointXYZ point;
-		int rgb_w=req.pose.x;
-		int rgb_h=req.pose.y;
-		std::string frame_id=req.frame_id;
-		std::string target_frame_id =req.target_frame_id;
+		int rgb_w=pose.x;
+		int rgb_h=pose.y;
+		
+		//std::string frame_id=frame_id;
+		//std::string target_frame_id =target_frame_id;
 		//pcl::PointXYZ target = pCloud.points[CoM.x + CoM.y * pCloud.width];
+
 
 		pcl_index = ( (rgb_w*current_cloud->width) + rgb_h);
 
@@ -140,7 +139,7 @@ bool convert2dto3dCallback(convert_2d_to_3d::get3Dfrom2D::Request  &req,
 		
 		pcl::fromROSMsg(*current_cloud,point_pcl);
 		double pcl_time_sec =current_cloud->header.stamp.toSec();
-		double current_req_sec=req.stamp.toSec();
+		double current_req_sec=time_stamp.toSec();
 		double diff=abs(pcl_time_sec-current_req_sec);
 		if (diff < time_diff_threshold && current_req_sec!=0.0){
 			ROS_WARN("No PCL Frame in sec diff time, expected<[%f] and got=[%f] : %s",time_diff_threshold,diff );
@@ -180,7 +179,7 @@ bool convert2dto3dCallback(convert_2d_to_3d::get3Dfrom2D::Request  &req,
 		}
         if(nb_pixel==0){
 			ROS_WARN("No pt to process around value x:%i,y:%i,radius:%i",rgb_w,rgb_h,current_pixel_radius);
-			return false;
+			return resultPoint;
 		}
 		ROS_DEBUG("Sumx[%f],Sumy[%f],Sumz[%f]",sum_x,sum_y,sum_z);
 		float avg_x = sum_x/float(nb_pixel);
@@ -189,9 +188,9 @@ bool convert2dto3dCallback(convert_2d_to_3d::get3Dfrom2D::Request  &req,
 		ROS_DEBUG("avg_x[%f],avg_y[%f],avg_z[%f]",avg_x,avg_y,avg_z);
 		ROS_DEBUG("width[%i],height[%i]",current_cloud->width,current_cloud->height);
 
-		res.point.x=avg_x;
-		res.point.y=avg_y;
-		res.point.z=avg_z;
+		//res.point.x=avg_x;
+		//res.point.y=avg_y;
+		//res.point.z=avg_z;
 
 		//Calculating object position in the map frame
 		geometry_msgs::PointStamped pt_stamp_in;
@@ -212,12 +211,12 @@ bool convert2dto3dCallback(convert_2d_to_3d::get3Dfrom2D::Request  &req,
         	//ROS_INFO("-->Pt a point optical ref : x:%f,y:%f",pt_stamp_in.point.x,pt_stamp_in.point.y);
         	//ROS_INFO("-->Pt a point map ref : x:%f,y:%f",pt_computed.point.x,pt_computed.point.y);
 
-			res.point=pt_computed.point;
+			resultPoint=pt_computed.point;
         	//pt_computed.header.frame_id = target_frame;
 
     	}
     	catch(tf::TransformException& ex){
-    		ROS_WARN("Received an exception trying to transform a point : %s", ex.what());
+    		ROS_WARN("[2D_TO_3D]Received an exception trying to transform a point : %s", ex.what());
       	}
 
 		if(display_marker){
@@ -230,108 +229,164 @@ bool convert2dto3dCallback(convert_2d_to_3d::get3Dfrom2D::Request  &req,
 
 		lock=false;
 		// ...
-	} catch (...) {
+	} catch (const std::exception &exc) {
 		lock=false;
-		ROS_WARN("Received an exception ");
-    	return false;
+		ROS_WARN("[2D_TO_3D] Received an exception: %s",exc.what());
+    	return resultPoint;
 	}
+
+
+	return resultPoint;
+}
+
+bool convert2dto3dCallback(convert_2d_to_3d::get3Dfrom2D::Request  &req,
+             convert_2d_to_3d::get3Dfrom2D::Response &res){
+				 if(current_cloud==0){
+					 return false;
+				 }
+				//ROS_WARN("[2D_TO_3D]Ros param frame_id: %s, target_frame_id:%s", req.frame_id.c_str(),req.target_frame_id.c_str());
+				 geometry_msgs::Point resultPoint=processBox(req.pose, req.frame_id, req.target_frame_id, req.stamp,req.pixel_radius);
+				res.point = resultPoint;
+	
 	return true;
 }
 
-//void getDarkNetBoxesCallback(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg){
-//	robocup_msgs::EntityList currentEntityList;
-//	
-//	//ROS_INFO("--> in   getDarkNetBoxesCallback");
-//	try{
-//		for(int i=0;i<msg->bounding_boxes.size();i++){
-//			darknet_ros_msgs::BoundingBox bounding_box=msg->bounding_boxes[i];
-//			if(!filter.compare(bounding_box.Class)){
-//				robocup_msgs::Entity currentEntity;
-//				//ROS_INFO("--> in LOOP  getDarkNetBoxesCallback");
-//				
-//				currentEntity.label=bounding_box.Class;
-//				//ROS_INFO("--> after Class  getDarkNetBoxesCallback");
-//				geometry_msgs::Pose currentPose;
-//				int rgb_w=(bounding_box.xmin + bounding_box.xmax) / 2;
-//				int rgb_h=(bounding_box.ymin + bounding_box.ymax) / 2;
-//				//ROS_INFO("--> after ymin  getDarkNetBoxesCallback");
-//				//process 2d ->3d
-//				std::string frame_id=msg->header.frame_id;
-//				currentEntity.header.frame_id=source_frame;
-//				int pcl_index;
-//				pcl::PointXYZ point;
-//				ROS_INFO("--> before ( (rgb_w*(current_cloud->width)) + rgb_h)  getDarkNetBoxesCallback");
-//				if (current_cloud != NULL){
-//					pcl_index = ( (rgb_w*(current_cloud->width)) + rgb_h);
-//					ROS_INFO("--> before fromROSMsg  getDarkNetBoxesCallback");
-//					pcl::fromROSMsg(*current_cloud,point_pcl);
-//					ROS_INFO("--> after fromROSMsg  getDarkNetBoxesCallback");
-//					point =point_pcl.at(pcl_index);
-//					if(isnan(point.x) || isnan(point.y) || isnan(point.z)){
-//							ROS_WARN("ISNAN value x:%f,y:%f,z:%f",point.x,point.y,point.z);
-//					}
+void getDarkNetBoxesCallback(const darknet_ros_msgs::BoundingBoxes::ConstPtr& msg){
+	robocup_msgs::EntityList currentEntityList;
+	
+	//ROS_INFO("--> in   getDarkNetBoxesCallback");
+	try{
+		for(int i=0;i<msg->bounding_boxes.size();i++){
+			darknet_ros_msgs::BoundingBox bounding_box=msg->bounding_boxes[i];
+			
+			//FIXME manage filter on class
+			//if(!filter.compare(bounding_box.Class)){
+				robocup_msgs::Entity currentEntity;
+				//ROS_INFO("--> in LOOP  getDarkNetBoxesCallback");
+				
+				currentEntity.label=bounding_box.Class;
+				//ROS_INFO("--> after Class  getDarkNetBoxesCallback");
+				geometry_msgs::Pose currentPose;
+
+				//CAUTION check the round by the cast
+  				geometry_msgs::Pose2D current_pose2d;
+				int rgb_w=bounding_box.ymax-(bounding_box.ymax-bounding_box.ymin)/2;
+				int rgb_h=bounding_box.xmax-(bounding_box.xmax-bounding_box.xmin)/2;
+				current_pose2d.x=rgb_w;
+ 				current_pose2d.y=rgb_h;
+				ros::Time current_stamp=ros::Time::now();
+
+
+
+				//ROS_INFO("--> after ymin  getDarkNetBoxesCallback");
+				//process 2d ->3d
+				std::string frame_id=msg->header.frame_id;
+				//FIXME to update with ros parameters
+				currentEntity.header.frame_id="map";
+
+
+
+
+				//OKcurrent_entity=Entity()
+                //OKcurrent_entity.label=box.Class
+
+              
+                //OKcurrent_pose2d=Pose2D()
+                //OKcurrent_pose2d.x=center[0]
+                //OKcurrent_pose2d.y=center[1]
+                //OK#rospy.loginfo(box)
+                //OK#rospy.loginfo(current_pose2d)
+                //OKcurrent_stamp =rospy.get_rostime()
+
+				
+
+
+				geometry_msgs::Point resultPoint=processBox(current_pose2d, frame_id, "map", current_stamp,10);
+
+
+				currentEntity.type = "Object";
+                currentEntity.pose.position.x=resultPoint.x;
+                currentEntity.pose.position.y = resultPoint.y;
+                currentEntity.pose.position.z = resultPoint.z;
+				std::string json = 	"{\"confidence\" : "+ std::to_string(bounding_box.probability) +"}";
+               // std::string json = '{"confidence":'+bounding_box.probability+'}';
+                currentEntity.payload=json;
+                currentEntityList.entityList.push_back(currentEntity);
+
+				//int pcl_index;
+				//pcl::PointXYZ point;
+				//ROS_INFO("--> before ( (rgb_w*(current_cloud->width)) + rgb_h)  getDarkNetBoxesCallback");
+				//if (current_cloud != NULL){
+				//	pcl_index = ( (rgb_w*(current_cloud->width)) + rgb_h);
+				//	ROS_INFO("--> before fromROSMsg  getDarkNetBoxesCallback");
+				//	pcl::fromROSMsg(*current_cloud,point_pcl);
+				//	ROS_INFO("--> after fromROSMsg  getDarkNetBoxesCallback");
+				//	point =point_pcl.at(pcl_index);
+				//	if(isnan(point.x) || isnan(point.y) || isnan(point.z)){
+				//			ROS_WARN("ISNAN value x:%f,y:%f,z:%f",point.x,point.y,point.z);
+				//	}
 //
 //
-//					if(isinf(point.x) || isinf(point.y) || isinf(point.z)){
-//							ROS_WARN("ISINF value x:%f,y:%f,z:%f",point.x,point.y,point.z);
-//					}
+				//	if(isinf(point.x) || isinf(point.y) || isinf(point.z)){
+				//			ROS_WARN("ISINF value x:%f,y:%f,z:%f",point.x,point.y,point.z);
+				//	}
 //
-//					//TODO CONVERT INTO /MAP or /BASEFOOTPRING Frameid
+				//	//TODO CONVERT INTO /MAP or /BASEFOOTPRING Frameid
 //
-//					geometry_msgs::PointStamped pt_computed;
-//					pt_computed.header.frame_id=source_frame;
-//					pt_computed.header.stamp=ros::Time();
-//					pt_computed.point.x=point.x;
-//					pt_computed.point.y=point.y;
-//					pt_computed.point.z=point.z;
+				//	geometry_msgs::PointStamped pt_computed;
+				//	pt_computed.header.frame_id=source_frame;
+				//	pt_computed.header.stamp=ros::Time();
+				//	pt_computed.point.x=point.x;
+				//	pt_computed.point.y=point.y;
+				//	pt_computed.point.z=point.z;
 //
-//				
-//        			geometry_msgs::PointStamped map_point;
-//				
-//        			//need to transform coord from OPtical Frame to Base_Link or Map 
-//        			tf::TransformListener listener;
-//        			listener.waitForTransform(msg->header.frame_id, target_frame, ros::Time(0), ros::Duration(5));
-//        			try{
-//						listener.transformPoint(target_frame, pt_computed, map_point);
-//        				ROS_INFO("-->Pt a point optical ref : x:%f,y:%f",pt_computed.point.x,pt_computed.point.y);
-//        				ROS_INFO("-->Pt a point map ref : x:%f,y:%f",map_point.point.x,map_point.point.y);
-//        				pt_computed.point.x=map_point.point.x;
-//        				pt_computed.point.y=map_point.point.y;
-//        				pt_computed.header.frame_id = target_frame;
-//						currentPose.position.x=pt_computed.point.x;
-//						currentPose.position.y=pt_computed.point.y;
-//						currentPose.position.z=pt_computed.point.z;
-//						currentEntity.header.frame_id=target_frame;
+				//
+        		//	geometry_msgs::PointStamped map_point;
+				//
+        		//	//need to transform coord from OPtical Frame to Base_Link or Map 
+        		//	tf::TransformListener listener;
+        		//	listener.waitForTransform(msg->header.frame_id, target_frame, ros::Time(0), ros::Duration(5));
+        		//	try{
+				//		listener.transformPoint(target_frame, pt_computed, map_point);
+        		//		ROS_INFO("-->Pt a point optical ref : x:%f,y:%f",pt_computed.point.x,pt_computed.point.y);
+        		//		ROS_INFO("-->Pt a point map ref : x:%f,y:%f",map_point.point.x,map_point.point.y);
+        		//		pt_computed.point.x=map_point.point.x;
+        		//		pt_computed.point.y=map_point.point.y;
+        		//		pt_computed.header.frame_id = target_frame;
+				//		currentPose.position.x=pt_computed.point.x;
+				//		currentPose.position.y=pt_computed.point.y;
+				//		currentPose.position.z=pt_computed.point.z;
+				//		currentEntity.header.frame_id=target_frame;
 //
-//    				}
-//    				catch(tf::TransformException& ex){
-//    					ROS_WARN("Received an exception trying to transform a point : %s", ex.what());
-//      				}
-//				}
-//				
+    			//	}
+    			//	catch(tf::TransformException& ex){
+    			//		ROS_WARN("Received an exception trying to transform a point : %s", ex.what());
+      			//	}
+				//}
+				
+
+				//currentEntity.pose=currentPose;
 //
-//				currentEntity.pose=currentPose;
-//
-//				currentEntityList.entityList.push_back(currentEntity);
-//				//ROS_INFO("--> before display_marker  getDarkNetBoxesCallback");
-//				if(display_marker){
-//					visualization_msgs::MarkerArray m_array;
-//					int id=std::rand();
-//					addMarker(m_array,currentEntity.pose.position.x,currentEntity.pose.position.y,currentEntity.pose.position.z,"test",currentEntity.header.frame_id,id);
-//					object_marker_pub.publish(m_array);
-//				}
-//			}
-//		}
-//
-//		// PUBLISH DATA
-//		object_entity_pub.publish(currentEntityList);
-//		ros::spinOnce();
-//
-//	} catch (...) {
-//		ROS_WARN("Exception getDarkNetBoxesCallback...");
-//    	return ;
-//	}
-//}
+				//currentEntityList.entityList.push_back(currentEntity);
+				////ROS_INFO("--> before display_marker  getDarkNetBoxesCallback");
+				//if(display_marker){
+				//	visualization_msgs::MarkerArray m_array;
+				//	int id=std::rand();
+				//	addMarker(m_array,currentEntity.pose.position.x,currentEntity.pose.position.y,currentEntity.pose.position.z,"test",currentEntity.header.frame_id,id);
+				//	object_marker_pub.publish(m_array);
+				//}
+			//}
+		}
+
+		// PUBLISH DATA
+		object_entity_pub.publish(currentEntityList);
+		ros::spinOnce();
+
+	} catch (...) {
+		ROS_WARN("Exception getDarkNetBoxesCallback...");
+    	return ;
+	}
+}
 
 
 /**
@@ -406,9 +461,9 @@ int main(int argc, char **argv) {
 
 	// Publisher
 	object_marker_pub = nh.advertise<visualization_msgs::MarkerArray>("/objet_pose_registred_pub", 1);
-	object_entity_pub = nh.advertise<robocup_msgs::EntityList>("/objects/entity", 1);
+	object_entity_pub = nh.advertise<robocup_msgs::EntityList>("/world_mng/objects/entity", 1);
 	sub_registered_pcl= nh.subscribe(pcl_topic, 1, getPclCallback);
-	//sub_registered_darknetBoxes=nh.subscribe("/darknet_ros/bounding_boxes",5, getDarkNetBoxesCallback);
+	sub_registered_darknetBoxes=nh.subscribe("/darknet_ros/bounding_boxes",5, getDarkNetBoxesCallback);
 	ros::ServiceServer service = nh.advertiseService(service_name, convert2dto3dCallback);
    	ROS_INFO("Ready to convert rgb coord to pcl 3d point.");
     ros::spin();

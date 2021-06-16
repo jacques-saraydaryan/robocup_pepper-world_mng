@@ -9,8 +9,8 @@ convert_2d_to_3d:
     service_name: "convert_2d_to_3d_1" #name of the service, could be overrided if multiple node instances are needed
     buffer_size: 1000
     buffer_ttl: 10 #in seconds
-    dbscan_eps_value: 0.2 #for DBSCAN to find clusters inside buffer
-    dbscan_min_samples:  2 #min number of elt to create cluster with DBSCAN inside buffer
+    dbscan_eps_value: 0.1 #for DBSCAN to find clusters inside buffer
+    dbscan_min_samples:  10 #min number of elt to create cluster with DBSCAN inside buffer
     #configuration for the tf broadcast during graph operation
     grasp_buffer_size: 100
     grasp_buffer_ttl: 2 #in seconds

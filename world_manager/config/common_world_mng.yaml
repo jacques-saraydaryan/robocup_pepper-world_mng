@@ -1,6 +1,6 @@
 world_manager : 
     postgres_user: "postgres"
-    postgres_user_pwd: "mypwd"    
+    postgres_user_pwd: "astro4Student"    
     postgres_db_name: "world_mng_db"
     postgres_ip: "172.17.0.2"
     postgres_port: "5432"
