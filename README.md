@@ -30,6 +30,7 @@ The ros nodes work as follow:
 
 <img src="./img/mergeStoreData.jpg" alt="Nodes organisation" width="600"/>
 
+[![Alt text](https://img.youtube.com/vi/oVP9j8P0WBo/0.jpg)](https://www.youtube.com/watch?v=oVP9j8P0WBo)
 
 ## 2. Authors
 * Jacques Saraydaryan
