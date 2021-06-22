@@ -32,6 +32,7 @@ add_service_files(
    saveEntity_service.srv
    select_object_in_range_service.srv
    select_object_in_room_service.srv
+   getNamoEntity.srv
 )
 
 ## Generate actions in the 'action' folder

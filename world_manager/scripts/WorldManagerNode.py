@@ -201,7 +201,6 @@ class WorldManagerNode:
     def saveEntityServiceCallback (self, req):
         entity_map={}
         #gather set of clusters by category
-        #FIXME what happen if 2 clusters with same label ?????????????
         for entity in req.entity_list.entityList:
             if entity.label not in entity_map:
 
