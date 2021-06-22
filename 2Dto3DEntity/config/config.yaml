@@ -8,9 +8,10 @@ convert_2d_to_3d:
     bbox_time_threshold: 0.2 # time limit between the received bouding box and the current time after which packet is dropped
     service_name: "convert_2d_to_3d_1" #name of the service, could be overrided if multiple node instances are needed
     buffer_size: 1000
-    buffer_ttl: 10 #in seconds
+    buffer_ttl: 30 #in seconds time to kept data into the queue
+    cluster_build_period: 5 # compute each 5 second clusters 
     dbscan_eps_value: 0.1 #for DBSCAN to find clusters inside buffer
-    dbscan_min_samples:  10 #min number of elt to create cluster with DBSCAN inside buffer
+    dbscan_min_samples:  3 #min number of elt to create cluster with DBSCAN inside buffer
     #configuration for the tf broadcast during graph operation
     grasp_buffer_size: 100
     grasp_buffer_ttl: 2 #in seconds

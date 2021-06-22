@@ -18,6 +18,7 @@ from threading import Thread, Lock
 class merge_register_data:
     PROCESS_MODE_REGISTRATION = 0
     PROCESS_MODE_GRASP = 1
+    CLUSTER_BUILD_PERIOD = 5
 
     def __init__(self):
         self.configure_ros()
@@ -66,6 +67,7 @@ class merge_register_data:
         self._grasp_dbscan_min_samples = rospy.get_param('/convert_2d_to_3d/grasp_dbscan_min_samples', 1)
 
         self._db_radius_to_merge = rospy.get_param('/convert_2d_to_3d/db_radius_to_merge', 0.1)
+        self.CLUSTER_BUILD_PERIOD = rospy.get_param('/convert_2d_to_3d/cluster_build_period', 5.0)
 
         rospy.loginfo('[merge_register_data_node] Parameters values:')
         rospy.loginfo('[merge_register_data_node] - /convert_2d_to_3d/buffer_size: %i'%self._buffer_size)
@@ -77,6 +79,7 @@ class merge_register_data:
         rospy.loginfo('[merge_register_data_node] - /convert_2d_to_3d/grasp_dbscan_eps_value: %f'%self._grasp_dbscan_eps_value)
         rospy.loginfo('[merge_register_data_node] - /convert_2d_to_3d/grasp_dbscan_min_samples: %f'%self._grasp_dbscan_min_samples)
         rospy.loginfo('[merge_register_data_node] - /convert_2d_to_3d/db_radius_to_merge: %f'%self._db_radius_to_merge)
+        rospy.loginfo('[merge_register_data_node] - /convert_2d_to_3d/cluster_build_period: %f'%self.CLUSTER_BUILD_PERIOD)
 
         self._switch_service = rospy.Service('merge_register_data_switch_config', SwitchMode, self.configSwitcherServiceCallBack)
 
@@ -106,12 +109,6 @@ class merge_register_data:
         for entity in entity_list:
             #check if process is needed
             with self.mergeProcessMng_lock:
-                clusters=self.mergeProcessMng.check_and_process_buffer()
-                if(len(clusters)!=0):
-                    # put current clusters to process into the queue
-                    # thread will process this cluster later
-                    self.cluster_to_publish.put(clusters)
-
                 self.mergeProcessMng.add_entity(entity,
                                             entity.pose.position.x,
                                             entity.pose.position.y,
@@ -138,12 +135,12 @@ class merge_register_data:
         while not rospy.is_shutdown():    
             #rospy.loginfo("current buffer size: %i"%(mergeProcessMng.buffer_entity_list[self.mergeProcessMng._current_buffer_indice].size()))
             with self.mergeProcessMng_lock:
-                clusters=self.mergeProcessMng.check_and_process_buffer()
+                clusters=self.mergeProcessMng.process_buffer()
                 if(len(clusters)!=0):
                     # put current clusters to process into the queue
                     # thread will process this cluster later
                     self.cluster_to_publish.put(clusters)
-            rospy.sleep(0.1)
+            rospy.sleep(self.CLUSTER_BUILD_PERIOD)
         rospy.loginfo("[merge_register_data_node] THREAD - _check_and_process STOPPED")
 
     def _convert_and_publish(self,i,clusters_queue):
