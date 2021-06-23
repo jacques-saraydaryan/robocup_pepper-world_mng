@@ -17,7 +17,7 @@ class NamoScan:
     COSTMAP_RESOLUTION=0.025
     DBSAN_MIN_SAMPLES= 1
     DBSAN_NO_CLUSTER_LABEL = -1
-    DISPLAY = True
+    DISPLAY = False
 
     def __init__(self):
         rospy.init_node('namo_scan', anonymous=True)

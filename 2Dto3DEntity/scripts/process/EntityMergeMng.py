@@ -60,8 +60,10 @@ class EntityMergeMng:
         #X = StandardScaler().fit_transform(coord_list)
 
         # Clusterized data using DBSCAN with x,y,z,category (one dimension per category --> OneHotEncoder)
-        db = DBSCAN(eps=self.DBSCAN_EPS_VALUE, min_samples=self.DBSAN_MIN_SAMPLES).fit(data)
-
+        try:
+            db = DBSCAN(eps=self.DBSCAN_EPS_VALUE, min_samples=self.DBSAN_MIN_SAMPLES).fit(data)
+        except Exception as e:
+            print('ERROR during point clustering DBSCAN e:'+e)
         #print("----------------------- Current DB ------------------")
         #print(db.labels_)
 
