@@ -1,0 +1,12 @@
+float32 x1
+float32 y1
+float32 x2
+float32 y2
+
+float32 dbscan_eps
+
+int32 dbscan_min_sample
+
+int32 costmap_threshold_value
+---
+geometry_msgs/Pose[] entity
