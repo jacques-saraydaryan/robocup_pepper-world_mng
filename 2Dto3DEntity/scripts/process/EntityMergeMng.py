@@ -72,7 +72,7 @@ class EntityMergeMng:
         try:
             db = DBSCAN(eps=self.DBSCAN_EPS_VALUE, min_samples=self.DBSAN_MIN_SAMPLES).fit(data)
         except Exception as e:
-            print('ERROR during point clustering DBSCAN e:'+e)
+            print('ERROR during point clustering DBSCAN e:'+str(e))
         #print("----------------------- Current DB ------------------")
         #print(db.labels_)
 

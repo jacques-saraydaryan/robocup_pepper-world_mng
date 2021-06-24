@@ -2,6 +2,7 @@ import time
 import Queue
 import numpy as np
 import threading
+import rospy
 
 
 class FifoEntity:
@@ -23,7 +24,7 @@ class FifoEntity:
         coord.append(z)
         coord.append(category)
         coord.append(entity.uuid)
-        coord.append(time.time())
+        coord.append(rospy.Time.now().secs)
         if self._fifo_coord.full():
             #if size exceeded remove oldest object and add new one
             with  self._lock:
@@ -80,12 +81,16 @@ class FifoEntity:
 
     def check_old_elt_in_queue(self):
         index_to_remove=[]
-        current_time=time.time()
+        current_time=rospy.Time.now().secs
         with  self._lock:
             #for i in range(self._fifo_coord.qsize()-1,0,-1):
             for i in range(0,self._fifo_coord.qsize()):
                 obj_time=self._fifo_coord.queue[i][5]
+                
+                #caution duration type
                 diff_time = current_time-obj_time
+                
+                
                 #print(self._fifo_coord.queue)
                 print('queue index:%i, entity uuid:%s, diff time %f, time %f'%(i,self._fifo_coord.queue[i][4],diff_time,self._fifo_coord.queue[i][5]))
                 if diff_time > self.data_ttl:
