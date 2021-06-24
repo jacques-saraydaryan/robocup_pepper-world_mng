@@ -24,9 +24,9 @@ class EntityMergeMng:
        self._fifo_entity.check_old_elt_in_queue()
         
     def reset_buffers(self):
-        for i in range (0, len(self.buffer_entity_list)):
-            self.buffer_entity_list[i].reset()
-        
+        #for i in range (0, len(self.buffer_entity_list)):
+        #    self.buffer_entity_list[i].reset()
+        pass
         
     def process_buffer(self):
         #remove old value first
@@ -42,7 +42,16 @@ class EntityMergeMng:
         m_coord_short= np.delete(m_coord, np.s_[4:6], axis=1)
         coordlist_cropped =  m_coord_short.tolist()
         print("----cropped list---")
-        print(coordlist_cropped)
+       
+        
+        try:
+            coordlist_cropped_array=np.array(coordlist_cropped)
+            (unique, counts) = np.unique(coordlist_cropped_array[:,3], return_counts=True)
+            print(unique)
+            print(counts)
+            print("|-----------------|")
+        except Exception as e:
+            print("Unexpected error:", e)
 
         #use category
         #ask to modify only the column id 3 (label) as OnehotEncoder

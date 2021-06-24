@@ -199,6 +199,7 @@ class WorldManagerNode:
             return []
 
     def saveEntityServiceCallback (self, req):
+        t0 = time.time()
         entity_map={}
         #gather set of clusters by category
         for entity in req.entity_list.entityList:
@@ -221,6 +222,8 @@ class WorldManagerNode:
                 current_coord_list.append((entity.pose.position.x,entity.pose.position.y,entity.pose.position.z))
         
             self._add_or_update_object(current_entity_list,current_coord_list,key,req.radius)
+            t1 = time.time()
+            rospy.logdebug("--------------------------------- duration: %f, for saving %i entites"%(t1-t0,len(req.entity_list.entityList)))
         return True
 
     def searchEntityInRoomServiceCallback(self, req):

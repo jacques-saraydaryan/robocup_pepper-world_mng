@@ -8,9 +8,9 @@ from std_msgs.msg import String
 from geometry_msgs.msg import Pose,Pose2D,Point
 from process.EntityMergeMng import EntityMergeMng
 from world_manager.srv import saveEntity_service
-from convert_2d_to_3d.srv import SwitchMode
+from convert_2d_to_3d.srv import SwitchMode,SwitchModeResponse
 
-
+import time
 import json
 import Queue
 from threading import Thread, Lock
@@ -119,7 +119,7 @@ class merge_register_data:
         self._category_filter_tag_list=req.category_filter_tag_list
         with self._process_mode_lock:
             self._process_mode=req.register_or_grap_mode
-        
+    
         if(req.register_or_grap_mode == self.PROCESS_MODE_REGISTRATION):
             with self.mergeProcessMng_lock:
                 self.mergeProcessMngForRegistration.reset_buffers()
@@ -128,6 +128,7 @@ class merge_register_data:
             with self.mergeProcessMng_lock:
                 self.mergeProcessMngForGrasp.reset_buffers()
                 self.mergeProcessMng= self.mergeProcessMngForGrasp
+        return SwitchModeResponse()
         
 
     def _check_and_process(self,):
@@ -135,7 +136,11 @@ class merge_register_data:
         while not rospy.is_shutdown():    
             #rospy.loginfo("current buffer size: %i"%(mergeProcessMng.buffer_entity_list[self.mergeProcessMng._current_buffer_indice].size()))
             with self.mergeProcessMng_lock:
+                t0 = time.time()
                 clusters=self.mergeProcessMng.process_buffer()
+                t1 = time.time()
+                rospy.logwarn("[merge_register_data_node] --------------------------- Time to process fifo (making cluster nb:%i) t:%f, period to process: %f"%(len(clusters),t1-t0,self.CLUSTER_BUILD_PERIOD))
+                
                 if(len(clusters)!=0):
                     # put current clusters to process into the queue
                     # thread will process this cluster later
