@@ -9,9 +9,9 @@ script_dir = os.path.dirname(__file__) #<-- absolute dir the script is in
 
 class PostGisDao:
     POSTGRES_USER = "postgres"
-    POSTGRES_USER_PWD = "pwd"
+    POSTGRES_USER_PWD = "mysecretpassword"
     POSTGRES_DB_NAME ="world_mng_db"
-    POSTGRES_IP="172.17.0.2"
+    POSTGRES_IP="172.17.0.3"
     POSTGRES_PORT="5432"
     CONFIG_PATH="../../config"
     CONFIG_FILE_NAME="schemas.sql"
