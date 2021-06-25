@@ -20,7 +20,7 @@ import uuid
 
 class WorldManagerNode:
     _node_is_ready = False
-    _broadcastTfPeriod = 2
+    _broadcastTfPeriod = 0.5
     _tfPublisherRunning = True
     NO_TTL_VALUE =-1
     DEFAULT_TTL_VALUE = 100
@@ -98,6 +98,7 @@ class WorldManagerNode:
                                      rospy.Time(0),
                                      str(obj['id'])+'_TF',
                                      "map")
+            #rospy.loginfo("----------------- broadcast ----------------- ")
             time.sleep(self._broadcastTfPeriod)
 
     ######################

@@ -18,7 +18,7 @@ from threading import Thread, Lock
 class merge_register_data:
     PROCESS_MODE_REGISTRATION = 0
     PROCESS_MODE_GRASP = 1
-    CLUSTER_BUILD_PERIOD = 5
+    CLUSTER_BUILD_PERIOD = 2
 
     def __init__(self):
         self.configure_ros()

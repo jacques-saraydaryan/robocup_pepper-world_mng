@@ -11,13 +11,14 @@ convert_2d_to_3d:
     buffer_ttl: 30 #in seconds time to kept data into the queue
     cluster_build_period: 2 # compute each 5 second clusters 
     dbscan_eps_value: 0.1 #for DBSCAN to find clusters inside buffer
-    dbscan_min_samples:  3 #min number of elt to create cluster with DBSCAN inside buffer
+    dbscan_min_samples:  4 #min number of elt to create cluster with DBSCAN inside buffer
     #configuration for the tf broadcast during graph operation
     grasp_buffer_size: 100
     grasp_buffer_ttl: 2 #in seconds
     grasp_dbscan_eps_value: 0.1 #for DBSCAN to find clusters inside buffer
     grasp_dbscan_min_samples:  1 #min number of elt to create cluster with DBSCAN inside buffer
     confidence_threshold: 0.3 # all bounding boxes with loawer confidense are dropped
+    drop_pcl_msg: 2
 
 
     db_radius_to_merge : 0.2 # distance to merge found clusters and elt inside db (calling service of world_manager with this parameter)
