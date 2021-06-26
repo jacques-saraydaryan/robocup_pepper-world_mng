@@ -19,6 +19,9 @@ if __name__ == '__main__':
         """Points d'interet RoboCup"""
         dao.add_geo_object("Room1","Itp",1.0,0.5,0,50,type_name="Itp")
         dao.add_geo_object("Room2","Itp",1.34,3.5,0,50,type_name="Itp")
+        dao.add_geo_object("Table_Perception","Itp",2.23,1.42,0,50,type_name="Itp",orient_x=0.0,orient_y=-0.0,orient_z=1,orient_w= 0)
+        dao.add_geo_object("Table_Grasp","Itp",2.08,1.71,0,50,type_name="Itp",orient_x=0.0,orient_y=-0.0,orient_z=0.9238795,orient_w= -0.3826834)
+        dao.add_geo_object("Perception_0","Itp",-0.24,0.23,0,50,type_name="Itp",orient_x=0.0,orient_y=-0.0,orient_z=0.5735764,orient_w=0.819152)
         dao.add_geo_object("GreenBac","Itp",2.42,-0.6,0,50,type_name="Itp",orient_x=0.0,orient_y=-0.0,orient_z=-0.7068252,orient_w=0.7073883)
         dao.add_geo_object("Plate","Itp",1.78,-0.26,0,50,type_name="Itp",orient_x=0.0,orient_y=-0.0,orient_z=-0.7068252,orient_w=0.7073883)
         dao.add_geo_object("Perception_1","Itp",0.4,0.3,0,50,type_name="Itp",orient_x=0.0,orient_y=-0.0,orient_z=0.9238787,orient_w= 0.3826855)
