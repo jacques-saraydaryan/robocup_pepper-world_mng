@@ -32,10 +32,10 @@ if __name__ == '__main__':
         dao.add_geo_object("Right_Person","Itp",0.82,4.0,0,50,type_name="Itp",orient_x=0.0,orient_y=-0.0,orient_z=0.9999997,orient_w= 0.0007963)
         dao.add_geo_object("Left_Person","Itp",0.82,2.9,0,50,type_name="Itp",orient_x=0.0,orient_y=-0.0,orient_z=0.9999997,orient_w= 0.0007963)
         dao.add_geo_object("NAMO_Observ","Itp",2.55,1.4,0,50,type_name="Itp",orient_x=0.0,orient_y=-0.0,orient_z=0.7071068,orient_w= 0.7071068)
-        dao.add_geo_object("Plate_0","Itp",1.97,0.68,0,50,type_name="Itp")
-        dao.add_geo_object("Plate_1","Itp",1.54,0.68,0,50,type_name="Itp")
-        dao.add_geo_object("Plate_2","Itp",1.97,0.52,0,50,type_name="Itp")
-        dao.add_geo_object("Plate_3","Itp",1.54,0.52,0,50,type_name="Itp")
+        dao.add_geo_object("Plate_0","Itp",1.97,-0.68,0,50,type_name="Itp")
+        dao.add_geo_object("Plate_1","Itp",1.54,-0.68,0,50,type_name="Itp")
+        dao.add_geo_object("Plate_2","Itp",1.97,-0.52,0,50,type_name="Itp")
+        dao.add_geo_object("Plate_3","Itp",1.54,-0.52,0,50,type_name="Itp")
 
     except Exception as err:
         print(err)
