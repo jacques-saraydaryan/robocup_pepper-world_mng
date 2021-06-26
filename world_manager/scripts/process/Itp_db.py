@@ -23,7 +23,7 @@ if __name__ == '__main__':
         dao.add_geo_object("Table_Grasp","Itp",2.08,1.71,0,50,type_name="Itp",orient_x=0.0,orient_y=-0.0,orient_z=0.9238795,orient_w= -0.3826834)
         dao.add_geo_object("Perception_0","Itp",-0.24,0.23,0,50,type_name="Itp",orient_x=0.0,orient_y=-0.0,orient_z=0.5735764,orient_w=0.819152)
         dao.add_geo_object("GreenBac","Itp",2.42,-0.6,0,50,type_name="Itp",orient_x=0.0,orient_y=-0.0,orient_z=-0.7068252,orient_w=0.7073883)
-        dao.add_geo_object("Plate","Itp",1.78,-0.26,0,50,type_name="Itp",orient_x=0.0,orient_y=-0.0,orient_z=-0.7068252,orient_w=0.7073883)
+        dao.add_geo_object("Plate","Itp",1.754,-0.059,0,50,type_name="Itp",orient_x=0.0,orient_y=-0.0,orient_z=-0.2542286,orient_w=0.9671442)
         dao.add_geo_object("Perception_1","Itp",0.4,0.3,0,50,type_name="Itp",orient_x=0.0,orient_y=-0.0,orient_z=0.9238787,orient_w= 0.3826855)
         dao.add_geo_object("Perception_2","Itp",1.9,0.104,0,50,type_name="Itp",orient_x=0.0,orient_y=-0.0,orient_z=0.9226898,orient_w= 0.3855431)
         dao.add_geo_object("Perception_3_2","Itp",2.3,3.6,0,50,type_name="Itp",orient_x=0.0,orient_y=-0.0,orient_z=0.7068252,orient_w= 0.7073883)
@@ -32,6 +32,10 @@ if __name__ == '__main__':
         dao.add_geo_object("Right_Person","Itp",0.82,4.0,0,50,type_name="Itp",orient_x=0.0,orient_y=-0.0,orient_z=0.9999997,orient_w= 0.0007963)
         dao.add_geo_object("Left_Person","Itp",0.82,2.9,0,50,type_name="Itp",orient_x=0.0,orient_y=-0.0,orient_z=0.9999997,orient_w= 0.0007963)
         dao.add_geo_object("NAMO_Observ","Itp",2.55,1.4,0,50,type_name="Itp",orient_x=0.0,orient_y=-0.0,orient_z=0.7071068,orient_w= 0.7071068)
+        dao.add_geo_object("Plate_0","Itp",1.97,0.68,0,50,type_name="Itp")
+        dao.add_geo_object("Plate_1","Itp",1.54,0.68,0,50,type_name="Itp")
+        dao.add_geo_object("Plate_2","Itp",1.97,0.52,0,50,type_name="Itp")
+        dao.add_geo_object("Plate_3","Itp",1.54,0.52,0,50,type_name="Itp")
 
     except Exception as err:
         print(err)
