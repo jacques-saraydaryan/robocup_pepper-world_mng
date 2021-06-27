@@ -1,8 +1,8 @@
 world_manager : 
     postgres_user: "postgres"
-    postgres_user_pwd: "mysecretpassword"    
+    postgres_user_pwd: "astro4Student" #"mysecretpassword"    
     postgres_db_name: "world_mng_db"
-    postgres_ip: "172.17.0.3"
+    postgres_ip: "172.17.0.2"
     postgres_port: "5432"
     broadcast_tf_period: 1
     re_create_db: false

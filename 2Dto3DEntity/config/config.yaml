@@ -4,6 +4,7 @@ convert_2d_to_3d:
     target_frame : "map"
     source_frame : "camera_depth_link"
     pcl_topic : "/camera/depth/points"
+    source_input_bounding_boxes_topic: "/darknet_ros/bounding_boxes"
     pixel_radius: 10 # number of pixel arround a given coordinate to compute average distance from pcl
     bbox_time_threshold: 0.2 # time limit between the received bouding box and the current time after which packet is dropped
     service_name: "convert_2d_to_3d_1" #name of the service, could be overrided if multiple node instances are needed
@@ -11,7 +12,7 @@ convert_2d_to_3d:
     buffer_ttl: 30 #in seconds time to kept data into the queue
     cluster_build_period: 2 # compute each 5 second clusters 
     dbscan_eps_value: 0.1 #for DBSCAN to find clusters inside buffer
-    dbscan_min_samples:  4 #min number of elt to create cluster with DBSCAN inside buffer
+    dbscan_min_samples:  7 #min number of elt to create cluster with DBSCAN inside buffer
     #configuration for the tf broadcast during graph operation
     grasp_buffer_size: 100
     grasp_buffer_ttl: 2 #in seconds
@@ -22,5 +23,7 @@ convert_2d_to_3d:
 
 
     db_radius_to_merge : 0.2 # distance to merge found clusters and elt inside db (calling service of world_manager with this parameter)
-    box_frame_id_sources: ["camera_depth_link"] # set of frameid of incoming bouding boxes information use to select suitable 2d_to_3d service
-    box_2d_3d_services: ["convert_2d_to_3d_kinect","convert_2d_to_3d_asus","convert_2d_to_3d_asus_base"] # set of 2d_to_3d services, related to box_frame_id_sources (tab indices refer to pair frame_id -> 2d_to_3d service)
+    box_frame_id_sources: ["camera_depth_link", "camera_depth_link_2"] # set of frameid of incoming bouding boxes information use to select suitable 2d_to_3d service
+    box_2d_3d_services: ["convert_2d_to_3d_asus","convert_2d_to_3d_asus_base"] # ["convert_2d_to_3d_kinect","convert_2d_to_3d_asus","convert_2d_to_3d_asus_base"] set of 2d_to_3d services, related to box_frame_id_sources (tab indices refer to pair frame_id -> 2d_to_3d service)
+
+    box_2d_3d_topics: ["/darknet_ros/bounding_boxes_arm","/darknet_ros/bounding_boxes_base"] # set of 2d_to_3d services, related to box_frame_id_sources (tab indices refer to pair frame_id -> 2d_to_3d service)

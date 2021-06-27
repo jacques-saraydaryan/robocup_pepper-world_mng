@@ -42,6 +42,7 @@ std::string FRAME_ID="";
 std::string filter;
 std::string target_frame,source_frame,pcl_topic;
 std::string service_name;
+std::string source_input_bounding_boxes_topic;
 int measure_radius,pixel_radius,drop_pcl_msg,current_pcl_count;
 
 bool display_marker=true;
@@ -500,6 +501,14 @@ int main(int argc, char **argv) {
 	ROS_INFO("- /convert_2d_to_3d/confidence_threshold: %f", confidence_threshold);
 
 
+	if (!ros::param::get("/convert_2d_to_3d/source_input_bounding_boxes_topic", source_input_bounding_boxes_topic))
+	    {
+	      source_input_bounding_boxes_topic="/darknet_ros/bounding_boxes";
+	    }
+	ROS_INFO("- /convert_2d_to_3d//darknet_ros/bounding_boxes: %s", source_input_bounding_boxes_topic.c_str());
+
+
+
 
 	
 
@@ -507,7 +516,7 @@ int main(int argc, char **argv) {
 	object_marker_pub = nh.advertise<visualization_msgs::MarkerArray>("/objet_pose_registred_pub", 1);
 	object_entity_pub = nh.advertise<robocup_msgs::EntityList>("/world_mng/objects/entity", 1);
 	sub_registered_pcl= nh.subscribe(pcl_topic, 1, getPclCallback);
-	sub_registered_darknetBoxes=nh.subscribe("/darknet_ros/bounding_boxes",1, getDarkNetBoxesCallback);
+	sub_registered_darknetBoxes=nh.subscribe(source_input_bounding_boxes_topic,1, getDarkNetBoxesCallback);
 	ros::ServiceServer service = nh.advertiseService(service_name, convert2dto3dCallback);
    	ROS_INFO("Ready to convert rgb coord to pcl 3d point.");
     ros::spin();
