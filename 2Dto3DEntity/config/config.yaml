@@ -12,7 +12,7 @@ convert_2d_to_3d:
     buffer_ttl: 30 #in seconds time to kept data into the queue
     cluster_build_period: 2 # compute each 5 second clusters 
     dbscan_eps_value: 0.1 #for DBSCAN to find clusters inside buffer
-    dbscan_min_samples:  7 #min number of elt to create cluster with DBSCAN inside buffer
+    dbscan_min_samples:  4 #min number of elt to create cluster with DBSCAN inside buffer
     #configuration for the tf broadcast during graph operation
     grasp_buffer_size: 100
     grasp_buffer_ttl: 2 #in seconds
